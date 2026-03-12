@@ -60,6 +60,8 @@ export interface PrintCalculationInput {
   roundingEnabled: boolean;
   complexityCoefficient: number;
   complexityLabel: string;
+  wholesaleEnabled?: boolean;
+  wholesaleDiscount?: number;
 }
 
 export interface PrintCalculationResult {
@@ -75,10 +77,13 @@ export interface PrintCalculationResult {
   complexityLabel: string;
   profit: number;
   pricePerPiece: number;
+  pricePerPieceBeforeDiscount: number;
+  wholesaleDiscountApplied: number;
   pricePerPieceRounded: number | null;
   totalCostPrice: number;
   totalProfit: number;
   totalPrice: number;
+  totalPriceBeforeDiscount: number;
   totalPriceRounded: number | null;
   printTimeHours: number;
   gramCost: number;
@@ -91,10 +96,19 @@ export interface PrintCalculationResult {
 export interface SavedCalculation {
   id: string;
   savedAt: string;
+  projectIds?: string[];
   input: PrintCalculationInput;
   result: PrintCalculationResult;
   spoolName?: string;
   printerName?: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  createdAt: string;
+  color?: string;
+  defectRate?: number;
 }
 
 export interface AppSettings {

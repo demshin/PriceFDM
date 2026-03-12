@@ -1,9 +1,12 @@
-import React from 'react';
+﻿import React, { useRef, useState } from 'react';
 import {
+  Alert,
   Box,
+  Button,
   Card,
   CardContent,
   Checkbox,
+  Collapse,
   Divider,
   FormControl,
   FormControlLabel,
@@ -22,8 +25,23 @@ import {
   Typography,
 } from '@mui/material';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import type { PrintCalculationInput, SpoolProfile, PrinterProfile, ProcessingItem } from '../../types';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import type { PrintCalculationInput, SpoolProfile, PrinterProfile, ProcessingItem, PlasticType } from '../../types';
 import { COMPLEXITY_OPTIONS } from '../../utils/defaults';
+import { parseGcode } from '../../utils/gcode';
+
+/** Нормализует тип пластика из G-code в PlasticType */
+function normalizePlasticType(ft: string): PlasticType {
+  const u = ft.toUpperCase();
+  if (u.includes('PETG') || (u.includes('PET') && !u.includes('PETG') === false)) return 'PETG';
+  if (u.includes('TPU') || u.includes('FLEX') || u.includes('TPE')) return 'TPU';
+  if (u.includes('ABS') || u.includes('ASA')) return 'ABS';
+  if (u.includes('NYLON') || u.startsWith('PA')) return 'Nylon';
+  if (u.includes('PLA')) return 'PLA';
+  return 'Другой';
+}
 
 interface ColorDotProps { color: string }
 const ColorDot: React.FC<ColorDotProps> = ({ color }) => (
@@ -36,24 +54,26 @@ interface Props {
   spools: SpoolProfile[];
   printers: PrinterProfile[];
   errors: Record<string, string>;
+  onClear?: () => void;
 }
 
-const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, errors }) => {
+const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, errors, onClear }) => {
+  const gcodeInputRef = useRef<HTMLInputElement>(null);
+  const [gcodeMessage, setGcodeMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const [gcodeModelWeightMissing, setGcodeModelWeightMissing] = useState(false);
+
   const set = <K extends keyof PrintCalculationInput>(key: K, value: PrintCalculationInput[K]) => {
     onChange({ ...input, [key]: value });
   };
 
-  // Эффективный вес для расчёта обработки: если введён вес модели — используем его, иначе общий вес
   const effectiveModelWeight = (w: number) =>
     input.modelWeight > 0 ? input.modelWeight : (input.partWeight > 0 ? input.partWeight : w);
 
-  // При изменении веса — пересчитываем per_gram этапы обработки (только включённые)
   const handleWeightChange = (field: 'partWeight' | 'modelWeight', value: number) => {
     const newInput = { ...input, [field]: value };
     const newModelW = field === 'modelWeight' ? value : input.modelWeight;
     const newPartW  = field === 'partWeight'  ? value : input.partWeight;
     const effW = newModelW > 0 ? newModelW : newPartW;
-
     const updatedItems = newInput.processing.items.map((item) => {
       if (item.costMode === 'per_gram' && item.ratePerGram && item.enabled && effW > 0) {
         return { ...item, cost: parseFloat((item.ratePerGram * effW).toFixed(2)) };
@@ -63,36 +83,96 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
     onChange({ ...newInput, processing: { ...newInput.processing, items: updatedItems } });
   };
 
+  const handleGcodeFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      const parsed = parseGcode(text);
+      const updates: Partial<PrintCalculationInput> = {};
+      if (parsed.weightGrams      !== undefined) updates.partWeight  = parsed.weightGrams;
+      if (parsed.modelWeightGrams !== undefined) updates.modelWeight = parsed.modelWeightGrams;
+      setGcodeModelWeightMissing(parsed.weightGrams !== undefined && parsed.modelWeightGrams === undefined);
+      if (parsed.printHours       !== undefined) updates.printHours   = parsed.printHours;
+      if (parsed.printMinutes     !== undefined) updates.printMinutes = parsed.printMinutes;
+
+      // --- Автоподбор катушки ---
+      let autoSpoolNote = '';
+      if (parsed.filamentType && !input.spoolProfileId) {
+        const normalizedType = normalizePlasticType(parsed.filamentType);
+        // Приоритет 1: совпадение по названию пресета
+        let matched: SpoolProfile | undefined;
+        if (parsed.filamentSettingsId) {
+          const sid = parsed.filamentSettingsId.toLowerCase();
+          matched = spools.find((s) => s.name.toLowerCase().includes(sid) || sid.includes(s.name.toLowerCase()));
+        }
+        // Приоритет 2: единственная катушка с нужным типом
+        if (!matched) {
+          const byType = spools.filter((s) => s.plasticType === normalizedType);
+          if (byType.length === 1) {
+            matched = byType[0];
+          } else if (byType.length > 1) {
+            autoSpoolNote = `найдено ${byType.length} катушки ${normalizedType} — выберите вручную`;
+          }
+        }
+        if (matched) {
+          updates.spoolProfileId = matched.id;
+          updates.spoolPrice = matched.price;
+          updates.spoolWeight = matched.weight;
+          autoSpoolNote = `катушка: ${matched.name}`;
+        }
+      }
+
+      const newInput = { ...input, ...updates };
+      if (parsed.weightGrams !== undefined) {
+        const effW = newInput.modelWeight > 0 ? newInput.modelWeight : newInput.partWeight;
+        const updatedItems = newInput.processing.items.map((item) => {
+          if (item.costMode === 'per_gram' && item.ratePerGram && item.enabled && effW > 0) {
+            return { ...item, cost: parseFloat((item.ratePerGram * effW).toFixed(2)) };
+          }
+          return item;
+        });
+        onChange({ ...newInput, processing: { ...newInput.processing, items: updatedItems } });
+      } else {
+        onChange(newInput);
+      }
+      const parts: string[] = [];
+      if (parsed.weightGrams !== undefined) {
+        const modelNote = parsed.modelWeightGrams !== undefined
+          ? ` (модель: ${parsed.modelWeightGrams} г)`
+          : '';
+        parts.push(`общий вес: ${parsed.weightGrams} г${modelNote}`);
+      }
+      if (parsed.printHours !== undefined || parsed.printMinutes !== undefined) {
+        const h = parsed.printHours ?? 0;
+        const m = parsed.printMinutes ?? 0;
+        parts.push(`время: ${h ? `${h} ч ` : ''}${m ? `${m} мин` : ''}`.trim());
+      }
+      if (autoSpoolNote) parts.push(autoSpoolNote);
+      if (parts.length > 0) {
+        setGcodeMessage({ text: `${parsed.slicerName ?? 'G-code'}: ${parts.join(', ')}`, ok: true });
+      } else {
+        setGcodeMessage({ text: 'Не удалось распознать данные в файле', ok: false });
+      }
+      setTimeout(() => setGcodeMessage(null), 5000);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const handleSpoolSelect = (id: string) => {
     const spool = spools.find((s) => s.id === id);
-    if (!spool) {
-      onChange({ ...input, spoolProfileId: undefined });
-      return;
-    }
-    onChange({
-      ...input,
-      spoolProfileId: spool.id,
-      spoolPrice: spool.price,
-      spoolWeight: spool.weight,
-    });
+    if (!spool) { onChange({ ...input, spoolProfileId: undefined }); return; }
+    onChange({ ...input, spoolProfileId: spool.id, spoolPrice: spool.price, spoolWeight: spool.weight });
   };
 
   const handlePrinterSelect = (id: string) => {
     const printer = printers.find((p) => p.id === id);
-    if (!printer) {
-      onChange({ ...input, printerProfileId: undefined });
-      return;
-    }
-    onChange({
-      ...input,
-      printerProfileId: printer.id,
-      powerWatts: printer.powerWatts,
-      printerCost: printer.printerCost,
-      printerLifeHours: printer.lifeHours,
-    });
+    if (!printer) { onChange({ ...input, printerProfileId: undefined }); return; }
+    onChange({ ...input, printerProfileId: printer.id, powerWatts: printer.powerWatts, printerCost: printer.printerCost, printerLifeHours: printer.lifeHours });
   };
 
-  // При включении/выключении этапа обработки — авто-заполняем стоимость для per_gram
   const handleProcessingItemToggle = (itemId: string, enabled: boolean) => {
     const effW = effectiveModelWeight(0);
     const updatedItems = input.processing.items.map((item) => {
@@ -106,26 +186,78 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
   };
 
   const updateProcessingItem = (itemId: string, updates: Partial<ProcessingItem>) => {
-    onChange({
-      ...input,
-      processing: {
-        ...input.processing,
-        items: input.processing.items.map((item) =>
-          item.id === itemId ? { ...item, ...updates } : item
-        ),
-      },
-    });
+    onChange({ ...input, processing: { ...input.processing, items: input.processing.items.map((item) => item.id === itemId ? { ...item, ...updates } : item) } });
   };
 
-  const selectedSpool = spools.find((s) => s.id === input.spoolProfileId);
+  const addCustomProcessingItem = () => {
+    const newItem: ProcessingItem = {
+      id: 'custom_' + Date.now().toString(36),
+      name: '',
+      enabled: true,
+      cost: 0,
+      costMode: 'fixed',
+      isCustom: true,
+    };
+    onChange({ ...input, processing: { ...input.processing, items: [...input.processing.items, newItem] } });
+  };
+
+  const removeCustomItem = (itemId: string) => {
+    onChange({ ...input, processing: { ...input.processing, items: input.processing.items.filter((item) => item.id !== itemId) } });
+  };
+
+  const selectedSpool   = spools.find((s) => s.id === input.spoolProfileId);
   const selectedPrinter = printers.find((p) => p.id === input.printerProfileId);
-  const gramCost =
-    input.spoolWeight > 0 && input.spoolPrice > 0
-      ? input.spoolPrice / input.spoolWeight
-      : 0;
+  const gramCost = input.spoolWeight > 0 && input.spoolPrice > 0 ? input.spoolPrice / input.spoolWeight : 0;
 
   return (
     <Stack spacing={2.5}>
+
+      {/* === Импорт G-code === */}
+      <Box>
+        <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
+          {onClear && (
+            <Button
+              variant="outlined"
+              color="inherit"
+              size="small"
+              startIcon={<DeleteOutlineIcon />}
+              onClick={onClear}
+            >
+              Очистить
+            </Button>
+          )}
+          <Button
+            variant="outlined"
+            startIcon={<UploadFileIcon />}
+            size="small"
+            onClick={() => gcodeInputRef.current?.click()}
+          >
+            Импорт G-code
+          </Button>
+          <Typography variant="caption" color="text.secondary">
+            PrusaSlicer, OrcaSlicer, Cura — автозаполнение веса и времени
+          </Typography>
+        </Stack>
+        <input
+          ref={gcodeInputRef}
+          type="file"
+          accept=".gcode,.gco,.nc,text/plain"
+          style={{ display: 'none' }}
+          onChange={handleGcodeFile}
+        />
+        <Collapse in={gcodeMessage !== null}>
+          {gcodeMessage && (
+            <Alert
+              severity={gcodeMessage.ok ? 'success' : 'warning'}
+              sx={{ mt: 1 }}
+              onClose={() => setGcodeMessage(null)}
+            >
+              {gcodeMessage.text}
+            </Alert>
+          )}
+        </Collapse>
+      </Box>
+
       {/* === Основные параметры === */}
       <Card variant="outlined">
         <CardContent>
@@ -166,15 +298,39 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
                   type="number"
                   value={input.modelWeight || ''}
                   onChange={(e) => handleWeightChange('modelWeight', parseFloat(e.target.value) || 0)}
-                  helperText="Только модель, без поддержек"
+                  helperText={
+                    gcodeModelWeightMissing && !input.modelWeight
+                      ? 'Не найден в G-code — введите вручную если есть поддержки'
+                      : 'Только модель, без поддержек'
+                  }
                   inputProps={{ min: 0, step: 0.1 }}
-                  InputProps={{ endAdornment: <Box component="span" sx={{ ml: 0.5, color: 'text.secondary', fontSize: '0.85em' }}>г</Box> }}
+                  InputProps={{
+                    endAdornment: (
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        {gcodeModelWeightMissing && !input.modelWeight && (
+                          <Tooltip
+                            title="Слайсер не записал вес модели отдельно. Если в модели есть поддержки или юбка — введите вес модели вручную. Если оставить пустым, расчёт будет по общему весу филамента."
+                            arrow
+                            placement="top"
+                          >
+                            <InfoOutlinedIcon
+                              fontSize="small"
+                              color="warning"
+                              sx={{ cursor: 'help', mr: 0.5 }}
+                            />
+                          </Tooltip>
+                        )}
+                        <Box component="span" sx={{ color: 'text.secondary', fontSize: '0.85em' }}>г</Box>
+                      </Box>
+                    ),
+                  }}
                   fullWidth
                   size="small"
                 />
               </Grid>
             </Grid>
 
+            {/* Количество + оптовый заказ */}
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
@@ -188,6 +344,39 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
                 />
               </Grid>
             </Grid>
+
+            {input.quantity > 1 && (
+              <Box>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={input.wholesaleEnabled ?? false}
+                      size="small"
+                      onChange={(e) => set('wholesaleEnabled', e.target.checked)}
+                    />
+                  }
+                  label={
+                    <Stack>
+                      <Typography variant="body2" fontWeight={600}>Оптовый заказ</Typography>
+                      <Typography variant="caption" color="text.secondary">Скидка на цену каждой детали</Typography>
+                    </Stack>
+                  }
+                />
+                {(input.wholesaleEnabled ?? false) && (
+                  <TextField
+                    label="Скидка за шт."
+                    type="number"
+                    value={input.wholesaleDiscount ?? 10}
+                    onChange={(e) => set('wholesaleDiscount', Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
+                    inputProps={{ min: 0, max: 100, step: 1 }}
+                    InputProps={{ endAdornment: <Box component="span" sx={{ ml: 0.5, color: 'text.secondary', fontSize: '0.85em' }}>%</Box> }}
+                    helperText="По умолчанию 10%"
+                    sx={{ width: 200, mt: 1 }}
+                    size="small"
+                  />
+                )}
+              </Box>
+            )}
 
             {/* Время печати */}
             <Box>
@@ -265,16 +454,10 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
                           label={
                             <Stack>
                               <Stack direction="row" alignItems="center" spacing={0.5}>
-                                <Typography variant="body2" fontWeight={selected ? 700 : 400}>
-                                  {opt.label}
-                                </Typography>
-                                <Typography variant="caption" color="primary.main" fontWeight={600}>
-                                  ×{opt.value}
-                                </Typography>
+                                <Typography variant="body2" fontWeight={selected ? 700 : 400}>{opt.label}</Typography>
+                                <Typography variant="caption" color="primary.main" fontWeight={600}>×{opt.value}</Typography>
                               </Stack>
-                              <Typography variant="caption" color="text.secondary">
-                                {opt.description}
-                              </Typography>
+                              <Typography variant="caption" color="text.secondary">{opt.description}</Typography>
                             </Stack>
                           }
                           sx={{ m: 0, width: '100%' }}
@@ -393,9 +576,7 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
                 >
                   <MenuItem value=""><em>Не выбран</em></MenuItem>
                   {printers.map((p) => (
-                    <MenuItem key={p.id} value={p.id}>
-                      {p.name} · {p.powerWatts} Вт
-                    </MenuItem>
+                    <MenuItem key={p.id} value={p.id}>{p.name} · {p.powerWatts} Вт</MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -469,9 +650,7 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
             control={
               <Checkbox
                 checked={input.processing.enabled}
-                onChange={(e) =>
-                  onChange({ ...input, processing: { ...input.processing, enabled: e.target.checked } })
-                }
+                onChange={(e) => onChange({ ...input, processing: { ...input.processing, enabled: e.target.checked } })}
               />
             }
             label={<Typography variant="subtitle1" fontWeight={600} color="primary">Обработка</Typography>}
@@ -493,7 +672,7 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
                 return (
                   <Box key={item.id}>
                     <Grid container alignItems="flex-start" spacing={1}>
-                      <Grid size={{ xs: 12, sm: 5 }}>
+                      <Grid size={{ xs: 12, sm: item.isCustom ? 4 : 5 }}>
                         <FormControlLabel
                           control={
                             <Checkbox
@@ -510,22 +689,20 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
                                 placeholder="Название этапа"
                                 size="small"
                                 variant="standard"
-                                sx={{ width: 160 }}
+                                sx={{ width: 140 }}
                               />
                             ) : (
                               <Stack>
                                 <Typography variant="body2">{item.name}</Typography>
                                 {rateHint && (
-                                  <Typography variant="caption" color="text.secondary">
-                                    {rateHint}
-                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">{rateHint}</Typography>
                                 )}
                               </Stack>
                             )
                           }
                         />
                       </Grid>
-                      <Grid size={{ xs: 12, sm: 7 }}>
+                      <Grid size={{ xs: 12, sm: item.isCustom ? 7 : 7 }}>
                         {item.enabled && (
                           <TextField
                             label="Стоимость"
@@ -540,11 +717,29 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
                           />
                         )}
                       </Grid>
+                      {item.isCustom && (
+                        <Grid size={{ xs: 'auto' }}>
+                          <Tooltip title="Удалить этап">
+                            <IconButton size="small" color="error" onClick={() => removeCustomItem(item.id)} sx={{ mt: 0.5 }}>
+                              <DeleteOutlineIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Grid>
+                      )}
                     </Grid>
                     <Divider sx={{ mt: 1 }} />
                   </Box>
                 );
               })}
+
+              <Button
+                size="small"
+                startIcon={<AddCircleOutlineIcon />}
+                onClick={addCustomProcessingItem}
+                sx={{ alignSelf: 'flex-start' }}
+              >
+                Добавить свой этап
+              </Button>
             </Stack>
           )}
         </CardContent>
@@ -574,21 +769,13 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
       <Card variant="outlined">
         <CardContent>
           <Stack direction="row" alignItems="center" spacing={1} mb={1.5}>
-            <Typography variant="subtitle1" fontWeight={600} color="primary">
-              Прибыль
-            </Typography>
+            <Typography variant="subtitle1" fontWeight={600} color="primary">Прибыль</Typography>
             <Tooltip title="Прибыль добавляется к себестоимости для получения итоговой цены">
-              <IconButton size="small">
-                <InfoOutlinedIcon fontSize="small" />
-              </IconButton>
+              <IconButton size="small"><InfoOutlinedIcon fontSize="small" /></IconButton>
             </Tooltip>
           </Stack>
 
-          <RadioGroup
-            row
-            value={input.profitMode}
-            onChange={(e) => set('profitMode', e.target.value as 'percent' | 'fixed')}
-          >
+          <RadioGroup row value={input.profitMode} onChange={(e) => set('profitMode', e.target.value as 'percent' | 'fixed')}>
             <FormControlLabel value="percent" control={<Radio size="small" />} label="Процент" />
             <FormControlLabel value="fixed" control={<Radio size="small" />} label="Фиксированная сумма" />
           </RadioGroup>
@@ -626,19 +813,12 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
       <Card variant="outlined">
         <CardContent>
           <FormControlLabel
-            control={
-              <Checkbox
-                checked={input.roundingEnabled}
-                onChange={(e) => set('roundingEnabled', e.target.checked)}
-              />
-            }
+            control={<Checkbox checked={input.roundingEnabled} onChange={(e) => set('roundingEnabled', e.target.checked)} />}
             label={
               <Stack>
-                <Typography variant="subtitle1" fontWeight={600} color="primary">
-                  Округление цены
-                </Typography>
+                <Typography variant="subtitle1" fontWeight={600} color="primary">Округление цены</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  До ₽1 (до ₽10, до ₽5 или до ₽50 — автоматически в зависимости от суммы)
+                  До ₽1 (до ₽5, до ₽10 или до ₽50 — автоматически в зависимости от суммы)
                 </Typography>
               </Stack>
             }

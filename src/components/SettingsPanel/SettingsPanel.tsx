@@ -18,7 +18,7 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import DownloadIcon from '@mui/icons-material/Download';
 import UploadIcon from '@mui/icons-material/Upload';
-import type { AppSettings, SpoolProfile, PrinterProfile, SavedCalculation } from '../../types';
+import type { AppSettings, SpoolProfile, PrinterProfile, SavedCalculation, Project } from '../../types';
 import { DEFAULT_SETTINGS } from '../../utils/defaults';
 import { exportAllData, parseBackup, type BackupData } from '../../utils/storage';
 
@@ -27,11 +27,12 @@ interface Props {
   spools: SpoolProfile[];
   printers: PrinterProfile[];
   history: SavedCalculation[];
+  projects: Project[];
   onUpdate: (settings: AppSettings) => void;
   onImport: (data: BackupData) => void;
 }
 
-const SettingsPanel: React.FC<Props> = ({ settings, spools, printers, history, onUpdate, onImport }) => {
+const SettingsPanel: React.FC<Props> = ({ settings, spools, printers, history, projects, onUpdate, onImport }) => {
   const set = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     onUpdate({ ...settings, [key]: value });
   };
@@ -41,7 +42,7 @@ const SettingsPanel: React.FC<Props> = ({ settings, spools, printers, history, o
   const [importInfo, setImportInfo] = useState('');
 
   const handleExport = () => {
-    exportAllData(spools, printers, history, settings);
+    exportAllData(spools, printers, history, projects, settings);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -58,7 +59,7 @@ const SettingsPanel: React.FC<Props> = ({ settings, spools, printers, history, o
         onImport(data);
         setImportStatus('ok');
         setImportInfo(
-          `Загружено: ${data.spools.length} катушек, ${data.printers.length} принтеров, ${data.history.length} записей истории`
+          `Загружено: ${data.spools.length} катушек, ${data.printers.length} принтеров, ${data.projects?.length ?? 0} проектов, ${data.history.length} записей истории`
         );
       }
     };

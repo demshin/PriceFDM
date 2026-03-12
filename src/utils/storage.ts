@@ -1,4 +1,4 @@
-import type { SpoolProfile, PrinterProfile, SavedCalculation, AppSettings } from '../types';
+import type { SpoolProfile, PrinterProfile, SavedCalculation, AppSettings, Project } from '../types';
 import { DEFAULT_SETTINGS } from './defaults';
 
 const KEYS = {
@@ -6,6 +6,8 @@ const KEYS = {
   PRINTERS: 'pfdm_printers',
   HISTORY: 'pfdm_history',
   SETTINGS: 'pfdm_settings',
+  PROJECTS: 'pfdm_projects',
+  DRAFT: 'pfdm_draft',
 } as const;
 
 function safeGet<T>(key: string, fallback: T): T {
@@ -18,11 +20,24 @@ function safeGet<T>(key: string, fallback: T): T {
   }
 }
 
-function safeSet<T>(key: string, value: T): void {
+function safeSet<T>(key: string, value: T): boolean {
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    return true;
   } catch {
     // localStorage quota exceeded or unavailable
+    return false;
+  }
+}
+
+export function isStorageAvailable(): boolean {
+  try {
+    const test = '__pfdm_test__';
+    localStorage.setItem(test, '1');
+    localStorage.removeItem(test);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -49,7 +64,15 @@ export function savePrinters(printers: PrinterProfile[]): void {
 // ---- History ----
 
 export function loadHistory(): SavedCalculation[] {
-  return safeGet<SavedCalculation[]>(KEYS.HISTORY, []);
+  const raw = safeGet<SavedCalculation[]>(KEYS.HISTORY, []);
+  // Миграция: старый формат projectId (string) → projectIds (string[])
+  return raw.map((item: SavedCalculation & { projectId?: string }) => {
+    if (item.projectId && !item.projectIds) {
+      const { projectId, ...rest } = item;
+      return { ...rest, projectIds: [projectId] };
+    }
+    return item;
+  });
 }
 
 export function saveHistory(history: SavedCalculation[]): void {
@@ -66,6 +89,31 @@ export function saveSettings(settings: AppSettings): void {
   safeSet(KEYS.SETTINGS, settings);
 }
 
+// ---- Projects ----
+
+export function loadProjects(): Project[] {
+  return safeGet<Project[]>(KEYS.PROJECTS, []);
+}
+
+export function saveProjects(projects: Project[]): void {
+  safeSet(KEYS.PROJECTS, projects);
+}
+
+// ---- Draft (autosave) ----
+import type { PrintCalculationInput } from '../types';
+
+export function saveDraft(input: PrintCalculationInput): void {
+  safeSet(KEYS.DRAFT, input);
+}
+
+export function loadDraft(): PrintCalculationInput | null {
+  return safeGet<PrintCalculationInput | null>(KEYS.DRAFT, null);
+}
+
+export function clearDraft(): void {
+  try { localStorage.removeItem(KEYS.DRAFT); } catch { /* ignore */ }
+}
+
 // ---- Export / Import ----
 
 export interface BackupData {
@@ -74,6 +122,7 @@ export interface BackupData {
   spools: SpoolProfile[];
   printers: PrinterProfile[];
   history: SavedCalculation[];
+  projects: Project[];
   settings: AppSettings;
 }
 
@@ -81,6 +130,7 @@ export function exportAllData(
   spools: SpoolProfile[],
   printers: PrinterProfile[],
   history: SavedCalculation[],
+  projects: Project[],
   settings: AppSettings,
 ): void {
   const backup: BackupData = {
@@ -89,6 +139,7 @@ export function exportAllData(
     spools,
     printers,
     history,
+    projects,
     settings,
   };
   const json = JSON.stringify(backup, null, 2);
@@ -112,6 +163,7 @@ export function parseBackup(json: string): BackupData | null {
       spools: Array.isArray(data.spools) ? data.spools : [],
       printers: Array.isArray(data.printers) ? data.printers : [],
       history: Array.isArray(data.history) ? data.history : [],
+      projects: Array.isArray(data.projects) ? data.projects : [],
       settings: data.settings ?? {},
     } as BackupData;
   } catch {

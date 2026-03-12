@@ -54,12 +54,20 @@ export function calculate(input: PrintCalculationInput): PrintCalculationResult 
     profit = Math.max(0, input.profitValue);
   }
 
-  const pricePerPiece = costPrice + profit;
+  const pricePerPieceBeforeDiscount = costPrice + profit;
+
+  // Оптовая скидка (только если количество > 1 и скидка включена)
+  const quantity = Math.max(1, Math.floor(input.quantity));
+  const wholesaleActive = (input.wholesaleEnabled ?? false) && quantity > 1;
+  const wholesaleDiscountApplied = wholesaleActive ? Math.max(0, Math.min(100, input.wholesaleDiscount ?? 10)) : 0;
+  const discountFactor = 1 - wholesaleDiscountApplied / 100;
+  const pricePerPiece = pricePerPieceBeforeDiscount * discountFactor;
+
   const pricePerPieceRounded = input.roundingEnabled ? roundPrice(pricePerPiece) : null;
 
-  const quantity = Math.max(1, Math.floor(input.quantity));
   const totalCostPrice = costPrice * quantity;
   const totalProfit = profit * quantity;
+  const totalPriceBeforeDiscount = pricePerPieceBeforeDiscount * quantity;
   const totalPrice = pricePerPiece * quantity;
   const totalPriceRounded = input.roundingEnabled ? roundPrice(totalPrice) : null;
 
@@ -76,10 +84,13 @@ export function calculate(input: PrintCalculationInput): PrintCalculationResult 
     complexityLabel,
     profit,
     pricePerPiece,
+    pricePerPieceBeforeDiscount,
+    wholesaleDiscountApplied,
     pricePerPieceRounded,
     totalCostPrice,
     totalProfit,
     totalPrice,
+    totalPriceBeforeDiscount,
     totalPriceRounded,
     printTimeHours,
     gramCost,

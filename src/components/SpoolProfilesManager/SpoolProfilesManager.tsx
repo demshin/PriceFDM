@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
+  Alert,
   Box,
   Button,
   Card,
   CardContent,
+  Checkbox,
   Chip,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -24,9 +27,11 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import FileUploadIcon from '@mui/icons-material/FileUpload';
 import type { SpoolProfile, PlasticType } from '../../types';
 import ConfirmDialog from '../common/ConfirmDialog';
 import { generateId } from '../../utils/storage';
+import { parseFilamentPresetsZip, presetToSpool, type FilamentPresetRecord } from '../../utils/filamentPresets';
 
 const PLASTIC_TYPES: PlasticType[] = ['PLA', 'PETG', 'ABS', 'TPU', 'Nylon', 'Другой'];
 
@@ -212,6 +217,67 @@ const SpoolProfilesManager: React.FC<Props> = ({ spools, onUpdate }) => {
   const [editTarget, setEditTarget] = useState<SpoolProfile | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SpoolProfile | null>(null);
 
+  // --- ZIP import state ---
+  const zipInputRef = useRef<HTMLInputElement>(null);
+  const [instructionDialogOpen, setInstructionDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError]   = useState<string | null>(null);
+  const [importRecords, setImportRecords] = useState<FilamentPresetRecord[]>([]);
+  const [importSelected, setImportSelected] = useState<Set<number>>(new Set());
+
+  const handleZipFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setInstructionDialogOpen(false);
+    setImportError(null);
+    setImportLoading(true);
+    setImportRecords([]);
+    setImportSelected(new Set());
+    setImportDialogOpen(true);
+    try {
+      const records = await parseFilamentPresetsZip(file);
+      if (records.length === 0) {
+        setImportError('В архиве не найдено ни одного пресета с полем filament_cost. Убедитесь, что вы выгрузили «Filament presets» из OrcaSlicer.');
+      } else {
+        // По умолчанию выбираем все
+        setImportRecords(records);
+        setImportSelected(new Set(records.map((_, i) => i)));
+      }
+    } catch (err) {
+      setImportError(`Ошибка чтения архива: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const handleImportConfirm = () => {
+    const newSpools = [...importRecords]
+      .filter((_, i) => importSelected.has(i))
+      .map(presetToSpool);
+    onUpdate([...spools, ...newSpools]);
+    setImportDialogOpen(false);
+    setImportRecords([]);
+    setImportSelected(new Set());
+  };
+
+  const toggleImportItem = (i: number) => {
+    setImportSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i); else next.add(i);
+      return next;
+    });
+  };
+
+  const toggleImportAll = () => {
+    if (importSelected.size === importRecords.length) {
+      setImportSelected(new Set());
+    } else {
+      setImportSelected(new Set(importRecords.map((_, i) => i)));
+    }
+  };
+
   const handleSave = (profile: SpoolProfile) => {
     const existing = spools.find((s) => s.id === profile.id);
     if (existing) {
@@ -243,9 +309,28 @@ const SpoolProfilesManager: React.FC<Props> = ({ spools, onUpdate }) => {
     <Box>
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
         <Typography variant="h6">Катушки с пластиком</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openNew}>
-          Добавить
-        </Button>
+        <Stack direction="row" spacing={1}>
+          <Tooltip title="Импорт пресетов из слайсера (OrcaSlicer, PrusaSlicer)">
+            <Button
+              variant="outlined"
+              startIcon={importLoading ? <CircularProgress size={16} /> : <FileUploadIcon />}
+              onClick={() => setInstructionDialogOpen(true)}
+              disabled={importLoading}
+            >
+              Импорт из Slicer
+            </Button>
+          </Tooltip>
+          <input
+            ref={zipInputRef}
+            type="file"
+            accept=".zip,application/zip"
+            style={{ display: 'none' }}
+            onChange={handleZipFile}
+          />
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openNew}>
+            Добавить
+          </Button>
+        </Stack>
       </Stack>
 
       {spools.length === 0 ? (
@@ -345,6 +430,144 @@ const SpoolProfilesManager: React.FC<Props> = ({ spools, onUpdate }) => {
         onCancel={() => setDeleteTarget(null)}
         danger
       />
+
+      {/* === Диалог инструкции экспорта === */}
+      <Dialog open={instructionDialogOpen} onClose={() => setInstructionDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Как экспортировать пресеты филамента из слайсера</DialogTitle>
+        <DialogContent>
+          <Alert severity="info" sx={{ mb: 2.5 }}>
+            Поддерживается OrcaSlicer и PrusaSlicer.
+            Цена пресета берётся из поля <b>filament_cost</b> — это цена за катушку 1 кг.
+          </Alert>
+
+          <Stack spacing={2}>
+            {[
+              { n: 1, text: <>Зайдите в свой слайсер (OrcaSlicer или PrusaSlicer).</> },
+              { n: 2, text: <>В верхнем меню нажмите <b>Файл</b>.</> },
+              { n: 3, text: <>Наведите на <b>Экспорт</b> → <b>Экспорт пакета профилей…</b></> },
+              { n: 4, text: <>В появившемся окне выберите <b>Filament presets (.zip)</b>.</> },
+              { n: 5, text: <>Отметьте все нужные пресеты и нажмите <b>Ок</b>.</> },
+              { n: 6, text: <>Загрузите полученный ZIP-файл нажав кнопку ниже.</> },
+            ].map(({ n, text }) => (
+              <Stack key={n} direction="row" spacing={1.5} alignItems="flex-start">
+                <Box
+                  sx={{
+                    width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                    bgcolor: 'primary.main', color: 'primary.contrastText',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontWeight: 700, fontSize: '0.85rem',
+                  }}
+                >
+                  {n}
+                </Box>
+                <Typography variant="body2" sx={{ pt: 0.5, lineHeight: 1.6 }}>
+                  {text}
+                </Typography>
+              </Stack>
+            ))}
+          </Stack>
+
+          <Divider sx={{ my: 2.5 }} />
+
+          <Stack alignItems="center">
+            <Button
+              variant="contained"
+              size="large"
+              startIcon={<FileUploadIcon />}
+              onClick={() => zipInputRef.current?.click()}
+              sx={{ px: 4 }}
+            >
+              Выбрать ZIP-файл…
+            </Button>
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+              Filament presets.zip
+            </Typography>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setInstructionDialogOpen(false)}>Закрыть</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* === Диалог импорта — список пресетов === */}
+      <Dialog open={importDialogOpen} onClose={() => setImportDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Выберите пресеты для импорта</DialogTitle>
+        <DialogContent>
+          {importLoading && (
+            <Stack alignItems="center" spacing={2} sx={{ py: 4 }}>
+              <CircularProgress />
+              <Typography color="text.secondary">Читаю архив…</Typography>
+            </Stack>
+          )}
+          {!importLoading && importError && (
+            <Alert severity="warning" sx={{ mb: 2 }}>{importError}</Alert>
+          )}
+          {!importLoading && importRecords.length > 0 && (
+            <>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1}>
+                <Typography variant="body2" color="text.secondary">
+                  Найдено {importRecords.length} пресетов. Выбрано: {importSelected.size}
+                </Typography>
+                <Button size="small" onClick={toggleImportAll}>
+                  {importSelected.size === importRecords.length ? 'Снять всё' : 'Выбрать всё'}
+                </Button>
+              </Stack>
+              <Divider sx={{ mb: 1 }} />
+              <Stack spacing={0.5} sx={{ maxHeight: 400, overflowY: 'auto' }}>
+                {importRecords.map((rec, i) => (
+                  <Stack
+                    key={i}
+                    direction="row"
+                    alignItems="center"
+                    spacing={1}
+                    sx={{
+                      p: 0.75,
+                      borderRadius: 1,
+                      bgcolor: importSelected.has(i) ? 'action.selected' : 'transparent',
+                    }}
+                  >
+                    <Checkbox
+                      size="small"
+                      checked={importSelected.has(i)}
+                      onChange={() => toggleImportItem(i)}
+                      sx={{ p: 0.5 }}
+                    />
+                    <Box
+                      sx={{
+                        width: 16, height: 16, borderRadius: '50%',
+                        bgcolor: rec.color, flexShrink: 0,
+                        border: '1.5px solid', borderColor: 'divider',
+                      }}
+                    />
+                    <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }} noWrap>
+                      {rec.name}
+                    </Typography>
+                    <Chip label={rec.plasticType} size="small" sx={{ flexShrink: 0 }} />
+                    <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
+                      {rec.pricePerKg.toLocaleString('ru-RU')} ₽/кг
+                    </Typography>
+                  </Stack>
+                ))}
+              </Stack>
+              <Divider sx={{ mt: 1 }} />
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                Цена из OrcaSlicer — это цена за кг (катушка 1000 г). После импорта можно
+                отредактировать каждую катушку индивидуально.
+              </Typography>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setImportDialogOpen(false)}>Закрыть</Button>
+          <Button
+            variant="contained"
+            onClick={handleImportConfirm}
+            disabled={importSelected.size === 0 || importLoading}
+          >
+            Добавить {importSelected.size > 0 ? `(${importSelected.size})` : ''}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

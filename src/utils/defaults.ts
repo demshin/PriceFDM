@@ -51,4 +51,6 @@ export const makeDefaultInput = (settings: AppSettings): PrintCalculationInput =
   roundingEnabled: false,
   complexityCoefficient: 1.0,
   complexityLabel: 'Очень простая',
+  wholesaleEnabled: false,
+  wholesaleDiscount: 10,
 });
