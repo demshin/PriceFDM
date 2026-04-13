@@ -6,6 +6,7 @@ import {
   Card,
   CardContent,
   Checkbox,
+  Chip,
   Collapse,
   Divider,
   FormControl,
@@ -61,6 +62,7 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
   const gcodeInputRef = useRef<HTMLInputElement>(null);
   const [gcodeMessage, setGcodeMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [gcodeModelWeightMissing, setGcodeModelWeightMissing] = useState(false);
+  const [gcodeIsMulticolor, setGcodeIsMulticolor] = useState(false);
 
   const set = <K extends keyof PrintCalculationInput>(key: K, value: PrintCalculationInput[K]) => {
     onChange({ ...input, [key]: value });
@@ -94,6 +96,7 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
       if (parsed.weightGrams      !== undefined) updates.partWeight  = parsed.weightGrams;
       if (parsed.modelWeightGrams !== undefined) updates.modelWeight = parsed.modelWeightGrams;
       setGcodeModelWeightMissing(parsed.weightGrams !== undefined && parsed.modelWeightGrams === undefined);
+      setGcodeIsMulticolor(parsed.isMulticolor === true);
       if (parsed.printHours       !== undefined) updates.printHours   = parsed.printHours;
       if (parsed.printMinutes     !== undefined) updates.printMinutes = parsed.printMinutes;
 
@@ -150,6 +153,7 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
         parts.push(`время: ${h ? `${h} ч ` : ''}${m ? `${m} мин` : ''}`.trim());
       }
       if (autoSpoolNote) parts.push(autoSpoolNote);
+      if (parsed.isMulticolor) parts.push('🌈 цветная печать');
       if (parts.length > 0) {
         setGcodeMessage({ text: `${parsed.slicerName ?? 'G-code'}: ${parts.join(', ')}`, ok: true });
       } else {
@@ -516,13 +520,16 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
 
             {selectedSpool && (
               <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 1 }}>
-                <Stack direction="row" spacing={2} flexWrap="wrap">
+                <Stack direction="row" spacing={2} flexWrap="wrap" alignItems="center">
                   <Stack direction="row" alignItems="center" spacing={0.5}>
                     <ColorDot color={selectedSpool.color} />
                     <Typography variant="caption">{selectedSpool.color}</Typography>
                   </Stack>
                   <Typography variant="caption" color="text.secondary">Тип: <strong>{selectedSpool.plasticType}</strong></Typography>
                   <Typography variant="caption" color="text.secondary">Цена 1 г: <strong>{gramCost.toFixed(2)} ₽</strong></Typography>
+                  {gcodeIsMulticolor && (
+                    <Chip label="🌈 Цветная" size="small" color="secondary" variant="outlined" sx={{ height: 20, fontSize: '0.7rem' }} />
+                  )}
                 </Stack>
               </Paper>
             )}

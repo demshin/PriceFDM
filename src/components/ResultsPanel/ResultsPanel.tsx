@@ -1,19 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Card,
   CardContent,
   Chip,
+  Collapse,
   Divider,
   Grid,
+  IconButton,
+  Slider,
   Stack,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
+import TuneIcon from '@mui/icons-material/Tune';
 import type { PrintCalculationResult, PrintCalculationInput, SpoolProfile, PrinterProfile } from '../../types';
-import { formatMoney } from '../../utils/calculations';
+import { formatMoney, roundPrice } from '../../utils/calculations';
 
 interface StatCardProps {
   label: string;
@@ -63,6 +68,19 @@ interface Props {
 const ResultsPanel: React.FC<Props> = ({ result, input, spools, printers }) => {
   const selectedSpool = spools.find((s) => s.id === input.spoolProfileId);
   const selectedPrinter = printers.find((p) => p.id === input.printerProfileId);
+  const [sliderOpen, setSliderOpen] = useState(false);
+  const [previewPct, setPreviewPct] = useState<number | null>(null);
+
+  // Предпросмотровая цена с другим % прибыли (только визуально, не меняет input)
+  const previewPrice = previewPct !== null
+    ? (input.profitMode === 'percent'
+        ? result.costPrice + result.costPrice * previewPct / 100
+        : result.costPrice + previewPct)
+    : null;
+  const previewPriceRounded = previewPrice !== null && result.roundingEnabled
+    ? roundPrice(previewPrice)
+    : previewPrice;
+  const previewTotal = previewPriceRounded !== null ? previewPriceRounded * Math.max(1, input.quantity) : null;
 
   const priceDisplay = result.roundingEnabled && result.pricePerPieceRounded !== null
     ? result.pricePerPieceRounded
@@ -223,6 +241,63 @@ const ResultsPanel: React.FC<Props> = ({ result, input, spools, printers }) => {
             : `Фиксированная прибыль: ${formatMoney(result.profit)}`}
         </Typography>
       </Box>
+
+      {/* Ползунок «А что если» */}
+      {result.profitMode === 'percent' && (
+        <Box>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Tooltip title={sliderOpen ? 'Скрыть симулятор цены' : 'Симулятор цены — что будет при другом % прибыли'}>
+              <IconButton size="small" color={sliderOpen ? 'primary' : 'default'} onClick={() => { setSliderOpen((v) => !v); setPreviewPct(result.profitValue); }}>
+                <TuneIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Typography variant="caption" color="text.secondary">
+              Симулятор % прибыли
+            </Typography>
+          </Stack>
+          <Collapse in={sliderOpen}>
+            <Box sx={{ px: 1.5, pt: 1, pb: 0.5, border: '1px dashed', borderColor: 'divider', borderRadius: 2, mt: 0.5 }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" mb={0.5}>
+                <Typography variant="caption" color="text.secondary">
+                  Текущая: <b>{result.profitValue}%</b> → {formatMoney(priceDisplay)}/шт.
+                </Typography>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Typography variant="caption" color="text.secondary">Предпросмотр:</Typography>
+                  <Typography variant="body2" fontWeight={700} color="primary">
+                    {previewPriceRounded !== null ? formatMoney(previewPriceRounded) : '—'}/шт.
+                  </Typography>
+                  {input.quantity > 1 && previewTotal !== null && (
+                    <Typography variant="caption" color="success.main">
+                      ({formatMoney(previewTotal)} всего)
+                    </Typography>
+                  )}
+                </Stack>
+              </Stack>
+              <Slider
+                value={previewPct ?? result.profitValue}
+                min={0}
+                max={Math.max(200, result.profitValue * 2)}
+                step={1}
+                onChange={(_, v) => setPreviewPct(v as number)}
+                valueLabelDisplay="auto"
+                valueLabelFormat={(v) => `${v}%`}
+                sx={{ color: 'primary.main' }}
+                marks={[
+                  { value: result.profitValue, label: `${result.profitValue}%` },
+                ]}
+              />
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                Маржа при {previewPct ?? result.profitValue}%: {previewPriceRounded !== null
+                  ? formatMoney(previewPriceRounded - result.costPrice)
+                  : '—'}
+                {previewPriceRounded !== null && result.costPrice > 0
+                  ? ` (${((previewPriceRounded - result.costPrice) / previewPriceRounded * 100).toFixed(1)}% от цены)`
+                  : ''}
+              </Typography>
+            </Box>
+          </Collapse>
+        </Box>
+      )}
     </Stack>
   );
 };

@@ -1,4 +1,4 @@
-import type { SpoolProfile, PrinterProfile, SavedCalculation, AppSettings, Project } from '../types';
+import type { SpoolProfile, PrinterProfile, SavedCalculation, AppSettings, Project, ProfitEntry, PrintCalculationInput } from '../types';
 import { DEFAULT_SETTINGS } from './defaults';
 
 const KEYS = {
@@ -8,6 +8,7 @@ const KEYS = {
   SETTINGS: 'pfdm_settings',
   PROJECTS: 'pfdm_projects',
   DRAFT: 'pfdm_draft',
+  PROFIT: 'pfdm_profit',
 } as const;
 
 function safeGet<T>(key: string, fallback: T): T {
@@ -100,7 +101,6 @@ export function saveProjects(projects: Project[]): void {
 }
 
 // ---- Draft (autosave) ----
-import type { PrintCalculationInput } from '../types';
 
 export function saveDraft(input: PrintCalculationInput): void {
   safeSet(KEYS.DRAFT, input);
@@ -114,6 +114,16 @@ export function clearDraft(): void {
   try { localStorage.removeItem(KEYS.DRAFT); } catch { /* ignore */ }
 }
 
+// ---- Profit Entries ----
+
+export function loadProfitEntries(): ProfitEntry[] {
+  return safeGet<ProfitEntry[]>(KEYS.PROFIT, []);
+}
+
+export function saveProfitEntries(entries: ProfitEntry[]): void {
+  safeSet(KEYS.PROFIT, entries);
+}
+
 // ---- Export / Import ----
 
 export interface BackupData {
@@ -124,6 +134,7 @@ export interface BackupData {
   history: SavedCalculation[];
   projects: Project[];
   settings: AppSettings;
+  profitEntries?: ProfitEntry[];
 }
 
 export function exportAllData(
@@ -132,6 +143,7 @@ export function exportAllData(
   history: SavedCalculation[],
   projects: Project[],
   settings: AppSettings,
+  profitEntries?: ProfitEntry[],
 ): void {
   const backup: BackupData = {
     version: 1,
@@ -141,6 +153,7 @@ export function exportAllData(
     history,
     projects,
     settings,
+    profitEntries: profitEntries ?? [],
   };
   const json = JSON.stringify(backup, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
@@ -165,6 +178,7 @@ export function parseBackup(json: string): BackupData | null {
       history: Array.isArray(data.history) ? data.history : [],
       projects: Array.isArray(data.projects) ? data.projects : [],
       settings: data.settings ?? {},
+      profitEntries: Array.isArray(data.profitEntries) ? data.profitEntries : [],
     } as BackupData;
   } catch {
     return null;

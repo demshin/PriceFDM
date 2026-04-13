@@ -18,7 +18,7 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import DownloadIcon from '@mui/icons-material/Download';
 import UploadIcon from '@mui/icons-material/Upload';
-import type { AppSettings, SpoolProfile, PrinterProfile, SavedCalculation, Project } from '../../types';
+import type { AppSettings, SpoolProfile, PrinterProfile, SavedCalculation, Project, ProfitEntry } from '../../types';
 import { DEFAULT_SETTINGS } from '../../utils/defaults';
 import { exportAllData, parseBackup, type BackupData } from '../../utils/storage';
 
@@ -28,11 +28,12 @@ interface Props {
   printers: PrinterProfile[];
   history: SavedCalculation[];
   projects: Project[];
+  profitEntries?: ProfitEntry[];
   onUpdate: (settings: AppSettings) => void;
   onImport: (data: BackupData) => void;
 }
 
-const SettingsPanel: React.FC<Props> = ({ settings, spools, printers, history, projects, onUpdate, onImport }) => {
+const SettingsPanel: React.FC<Props> = ({ settings, spools, printers, history, projects, profitEntries, onUpdate, onImport }) => {
   const set = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     onUpdate({ ...settings, [key]: value });
   };
@@ -42,7 +43,7 @@ const SettingsPanel: React.FC<Props> = ({ settings, spools, printers, history, p
   const [importInfo, setImportInfo] = useState('');
 
   const handleExport = () => {
-    exportAllData(spools, printers, history, projects, settings);
+    exportAllData(spools, printers, history, projects, settings, profitEntries ?? []);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

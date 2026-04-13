@@ -14,6 +14,8 @@ export interface GcodeParseResult {
   filamentColor?: string;
   /** Производитель, напр. "NIT" */
   filamentVendor?: string;
+  /** Цветная печать — несколько юзов / смена цветов */
+  isMulticolor?: boolean;
 }
 
 /**
@@ -64,7 +66,7 @@ export function parseGcode(content: string): GcodeParseResult {
       result.modelWeightGrams = directModel;
     } else {
       // Иначе считаем как общий минус поддержки и юбка
-      const supportWeight = parseLayerWeight(content, 'support(?:\s+interface)?');
+      const supportWeight = parseLayerWeight(content, 'support(?:\\s+interface)?');
       const brimWeight    = parseLayerWeight(content, 'brim|skirt');
       const deductible = (supportWeight ?? 0) + (brimWeight ?? 0);
       if (deductible > 0) {
@@ -134,8 +136,29 @@ export function parseGcode(content: string): GcodeParseResult {
   if (fsIdMatch) result.filamentSettingsId = fsIdMatch[1].trim();
 
   // ; filament_colour = #00EAEA
-  const colorMatch = content.match(/;\s*filament_colour\s*=\s*([#\w]+)/i);
-  if (colorMatch) result.filamentColor = colorMatch[1].trim();
+  // OrcaSlicer multicolor: ; filament_colour = #C0C0C0;#FF0000;#00FF00 или ["#color1","#color2"]
+  const colorMatch = content.match(/;\s*filament_colour\s*=\s*([^\r\n]+)/i);
+  if (colorMatch) {
+    const rawColor = colorMatch[1].trim();
+    // Определяем цветную печать: больше одного уникального цвета
+    const hexColors = [...rawColor.matchAll(/#[0-9a-fA-F]{6}/g)].map((m) => m[0].toLowerCase());
+    const uniqueColors = [...new Set(hexColors)];
+    if (uniqueColors.length > 0) result.filamentColor = uniqueColors[0];
+    if (uniqueColors.length > 1) result.isMulticolor = true;
+  }
+
+  // PrusaSlicer тоже может записать цвета через filament_colour_raw_first
+  if (!result.isMulticolor) {
+    // Проверяем по количеству юзов (каждый юз = T0, T1, T2...)
+    const toolChanges = content.match(/^T([1-9]\d*)/gm);
+    if (toolChanges && toolChanges.length > 0) result.isMulticolor = true;
+  }
+
+  // Доп. проверка через ; filament_type = PLA;PETG (два разных типа = два юза)
+  if (!result.isMulticolor && result.filamentType) {
+    const types = result.filamentType.split(';').filter(Boolean);
+    if (types.length > 1) result.isMulticolor = true;
+  }
 
   // ; filament_vendor = NIT
   const vendorMatch = content.match(/;\s*filament_vendor\s*=\s*([^\r\n]+)/i);
