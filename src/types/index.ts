@@ -101,6 +101,7 @@ export interface SavedCalculation {
   result: PrintCalculationResult;
   spoolName?: string;
   printerName?: string;
+  note?: string;
 }
 
 export interface Project {
@@ -117,4 +118,30 @@ export interface AppSettings {
   defaultPrinterLifeHours: number;
   defaultProfitPercent: number;
   colorMode: 'light' | 'dark';
+}
+
+/**
+ * Запись в таблице прибыли.
+ * Может быть создана автоматически из расчёта/проекта или добавлена вручную.
+ */
+export interface ProfitEntry {
+  id: string;
+  createdAt: string;
+  /** Отображаемое название (название детали, проекта или ручная запись) */
+  label: string;
+  /** Количество штук/повторений */
+  quantity: number;
+  /**
+   * Базовая себестоимость за 1 шт. (только материал + электричество + износ, без обработки и наценки).
+   * Для ручных записей — вводится пользователем.
+   */
+  baseCostPerPiece: number;
+  /** Цена продажи за 1 шт. */
+  salePricePerPiece: number;
+  /** ID расчёта из истории (если создан автоматически) */
+  calculationId?: string;
+  /** ID проекта (если создан из проекта) */
+  projectId?: string;
+  /** Ручная запись (не привязана к расчёту) */
+  isManual?: boolean;
 }

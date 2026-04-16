@@ -5,6 +5,7 @@ import {
   Box,
   Button,
   Checkbox,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -15,12 +16,20 @@ import {
   Paper,
   Snackbar,
   Stack,
+  Step,
+  StepContent,
+  StepLabel,
+  Stepper,
   TextField,
   Typography,
 } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
+import PrinterIcon from '@mui/icons-material/Print';
+import SpoolIcon from '@mui/icons-material/ViewInAr';
+import CalculateIcon from '@mui/icons-material/Calculate';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { getTheme } from './theme';
-import type { AppSettings, PrintCalculationInput, Project, SavedCalculation, SpoolProfile, PrinterProfile } from './types';
+import type { AppSettings, PrintCalculationInput, Project, SavedCalculation, SpoolProfile, PrinterProfile, ProfitEntry } from './types';
 import Layout, { type AppTab } from './components/Layout/Layout';
 import CalculatorForm from './components/CalculatorForm/CalculatorForm';
 import ResultsPanel from './components/ResultsPanel/ResultsPanel';
@@ -29,7 +38,8 @@ import SpoolProfilesManager from './components/SpoolProfilesManager/SpoolProfile
 import PrinterProfilesManager from './components/PrinterProfilesManager/PrinterProfilesManager';
 import HistoryPanel from './components/HistoryPanel/HistoryPanel';
 import SettingsPanel from './components/SettingsPanel/SettingsPanel';
-import { calculate } from './utils/calculations';
+import ProfitPanel from './components/ProfitPanel/ProfitPanel';
+import { calculate, formatMoney } from './utils/calculations';
 import {
   generateId,
   loadHistory,
@@ -45,6 +55,8 @@ import {
   saveProjects,
   saveSettings,
   saveSpools,
+  loadProfitEntries,
+  saveProfitEntries,
 } from './utils/storage';
 import { makeDefaultInput } from './utils/defaults';
 
@@ -52,7 +64,7 @@ import { makeDefaultInput } from './utils/defaults';
 interface SaveDialogProps {
   open: boolean;
   projects: Project[];
-  onSave: (projectIds: string[]) => void;
+  onSave: (projectIds: string[], note: string) => void;
   onClose: () => void;
   onCreateProject: (name: string) => Project;
 }
@@ -66,6 +78,7 @@ const SaveToProjectDialog: React.FC<SaveDialogProps> = ({
 }) => {
   const [selected, setSelected] = React.useState<string[]>([]);
   const [newName, setNewName] = React.useState('');
+  const [note, setNote] = React.useState('');
 
   const toggle = (id: string) =>
     setSelected((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
@@ -79,8 +92,9 @@ const SaveToProjectDialog: React.FC<SaveDialogProps> = ({
   };
 
   const handleSave = () => {
-    onSave(selected);
+    onSave(selected, note.trim());
     setSelected([]);
+    setNote('');
   };
 
   return (
@@ -125,6 +139,16 @@ const SaveToProjectDialog: React.FC<SaveDialogProps> = ({
             Создать
           </Button>
         </Stack>
+        <Divider sx={{ my: 1.5 }}>комментарий</Divider>
+        <TextField
+          size="small"
+          fullWidth
+          multiline
+          maxRows={3}
+          placeholder="Необязательная заметка к расчёту..."
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Отмена</Button>
@@ -143,6 +167,7 @@ const App: React.FC = () => {
   const [printers, setPrinters] = useState<PrinterProfile[]>(() => loadPrinters());
   const [history, setHistory] = useState<SavedCalculation[]>(() => loadHistory());
   const [projects, setProjects] = useState<Project[]>(() => loadProjects());
+  const [profitEntries, setProfitEntries] = useState<ProfitEntry[]>(() => loadProfitEntries());
   const [activeTab, setActiveTab] = useState<AppTab>('calculator');
   const [input, setInput] = useState<PrintCalculationInput>(() => {
     const draft = loadDraft();
@@ -158,6 +183,10 @@ const App: React.FC = () => {
   const [draftSnackbarVisible, setDraftSnackbarVisible] = useState<boolean>(() => loadDraft() !== null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState<boolean>(
+    () => !localStorage.getItem('pfdm_onboarding_done')
+  );
+  const [onboardingStep, setOnboardingStep] = useState(0);
   const [confirmClearForm, setConfirmClearForm] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
@@ -170,6 +199,7 @@ const App: React.FC = () => {
   useEffect(() => { savePrinters(printers); }, [printers]);
   useEffect(() => { saveHistory(history); }, [history]);
   useEffect(() => { saveProjects(projects); }, [projects]);
+  useEffect(() => { saveProfitEntries(profitEntries); }, [profitEntries]);
   useEffect(() => { saveDraft(input); }, [input]);
 
   const result = useMemo(() => calculate(input), [input]);
@@ -181,7 +211,7 @@ const App: React.FC = () => {
     return Object.keys(errs).length === 0;
   };
 
-  const doSaveCalculation = useCallback((projectIds: string[]) => {
+  const doSaveCalculation = useCallback((projectIds: string[], note: string) => {
     const selectedSpool = spools.find((s) => s.id === input.spoolProfileId);
     const selectedPrinter = printers.find((p) => p.id === input.printerProfileId);
     const calc: SavedCalculation = {
@@ -192,6 +222,7 @@ const App: React.FC = () => {
       result: { ...result },
       spoolName: selectedSpool?.name,
       printerName: selectedPrinter?.name,
+      note: note || undefined,
     };
     setHistory((prev) => [calc, ...prev]);
     clearDraft();
@@ -200,6 +231,10 @@ const App: React.FC = () => {
     const label = names.length > 0 ? `в проекты: ${names.join(', ')}` : 'без проекта';
     setSnackbar({ open: true, message: `Расчёт сохранён ${label}`, severity: 'success' });
   }, [input, result, spools, printers, projects]);
+
+  const handleUpdateNote = useCallback((id: string, note: string) => {
+    setHistory((prev) => prev.map((h) => h.id === id ? { ...h, note: note || undefined } : h));
+  }, []);
 
   const handleSaveCalculation = () => {
     if (!validateForm()) {
@@ -257,8 +292,30 @@ const App: React.FC = () => {
     setPrinters(data.printers);
     setHistory(data.history);
     setProjects(data.projects ?? []);
+    if (data.profitEntries) setProfitEntries(data.profitEntries);
     if (data.settings) setSettings((prev) => ({ ...prev, ...data.settings }));
     setSnackbar({ open: true, message: 'Данные успешно восстановлены из резервной копии', severity: 'success' });
+  }, []);
+
+  const handleAddToProfit = useCallback((item: SavedCalculation) => {
+    const { result, input: inp } = item;
+    const baseCostPerPiece = result.materialCost + result.electricityCost + result.wearCostRaw;
+    const salePricePerPiece =
+      result.roundingEnabled && result.pricePerPieceRounded !== null
+        ? result.pricePerPieceRounded
+        : result.pricePerPiece;
+    const entry: ProfitEntry = {
+      id: generateId(),
+      createdAt: new Date().toISOString(),
+      label: inp.partName || 'Без названия',
+      quantity: inp.quantity ?? 1,
+      baseCostPerPiece,
+      salePricePerPiece,
+      calculationId: item.id,
+    };
+    setProfitEntries((prev) => [...prev, entry]);
+    setActiveTab('profit');
+    setSnackbar({ open: true, message: `«${entry.label}» добавлено в таблицу прибыли`, severity: 'success' });
   }, []);
 
   const hasResult = input.partWeight > 0 || input.printHours > 0 || input.printMinutes > 0;
@@ -278,6 +335,36 @@ const App: React.FC = () => {
         }
       >
         {activeTab === 'calculator' && (
+          <Stack spacing={3}>
+            {/* Мини-статистика */}
+            {history.length > 0 && (
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                <Chip
+                  size="small"
+                  label={`Расчётов: ${history.length}`}
+                  variant="outlined"
+                  color="primary"
+                />
+                <Chip
+                  size="small"
+                  label={`Сумма заказов: ${formatMoney(
+                    history.reduce((acc, h) => acc + (
+                      h.result.roundingEnabled && h.result.totalPriceRounded !== null
+                        ? h.result.totalPriceRounded
+                        : h.result.totalPrice
+                    ), 0)
+                  )}`}
+                  variant="outlined"
+                  color="success"
+                />
+                <Chip
+                  size="small"
+                  label={`Суммарная прибыль: ${formatMoney(history.reduce((acc, h) => acc + h.result.totalProfit, 0))}`}
+                  variant="outlined"
+                  color="warning"
+                />
+              </Stack>
+            )}
           <Grid container spacing={3}>
             <Grid size={{ xs: 12, lg: 6 }}>
               <CalculatorForm
@@ -339,6 +426,7 @@ const App: React.FC = () => {
               )}
             </Grid>
           </Grid>
+          </Stack>
         )}
 
         {activeTab === 'spools' && (
@@ -366,7 +454,15 @@ const App: React.FC = () => {
               onRenameProject={handleRenameProject}
               onSetProjectIds={handleSetProjectIds}
               onUpdateProject={handleUpdateProject}
+              onAddToProfit={handleAddToProfit}
+              onUpdateNote={handleUpdateNote}
             />
+          </Paper>
+        )}
+
+        {activeTab === 'profit' && (
+          <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
+            <ProfitPanel entries={profitEntries} onUpdate={setProfitEntries} />
           </Paper>
         )}
 
@@ -378,6 +474,7 @@ const App: React.FC = () => {
                 printers={printers}
                 history={history}
                 projects={projects}
+                profitEntries={profitEntries}
                 onUpdate={setSettings}
                 onImport={handleImportBackup}
               />
@@ -418,6 +515,123 @@ const App: React.FC = () => {
         onClose={() => setSaveDialogOpen(false)}
         onCreateProject={handleCreateProject}
       />
+
+      {/* ─── Онбординг ──────────────────────────────────────────────────────── */}
+      <Dialog
+        open={onboardingOpen}
+        onClose={() => { localStorage.setItem('pfdm_onboarding_done', '1'); setOnboardingOpen(false); }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <CalculateIcon color="primary" />
+            <Typography variant="h6" fontWeight={700}>Добро пожаловать в PriceFDM!</Typography>
+          </Stack>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Три шага — и вы готовы считать стоимость печати
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Stepper activeStep={onboardingStep} orientation="vertical">
+            <Step completed={onboardingStep > 0 || printers.length > 0}>
+              <StepLabel
+                StepIconComponent={() =>
+                  printers.length > 0
+                    ? <CheckCircleIcon color="success" fontSize="small" />
+                    : <PrinterIcon color={onboardingStep === 0 ? 'primary' : 'disabled'} fontSize="small" />
+                }
+              >
+                <Typography fontWeight={600}>Добавьте принтер</Typography>
+              </StepLabel>
+              <StepContent>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                  Укажите мощность принтера, его стоимость и ресурс работы — это нужно для точного расчёта износа и электроэнергии.
+                </Typography>
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<PrinterIcon />}
+                  onClick={() => { setActiveTab('printers'); setOnboardingStep(1); }}
+                >
+                  Перейти к принтерам
+                </Button>
+              </StepContent>
+            </Step>
+
+            <Step completed={onboardingStep > 1 || spools.length > 0}>
+              <StepLabel
+                StepIconComponent={() =>
+                  spools.length > 0
+                    ? <CheckCircleIcon color="success" fontSize="small" />
+                    : <SpoolIcon color={onboardingStep === 1 ? 'primary' : 'disabled'} fontSize="small" />
+                }
+              >
+                <Typography fontWeight={600}>Добавьте катушку</Typography>
+              </StepLabel>
+              <StepContent>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                  Укажите тип пластика, вес и цену катушки — расчёт стоимости материала будет из этих данных.
+                </Typography>
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<SpoolIcon />}
+                  onClick={() => { setActiveTab('spools'); setOnboardingStep(2); }}
+                >
+                  Перейти к катушкам
+                </Button>
+              </StepContent>
+            </Step>
+
+            <Step>
+              <StepLabel
+                StepIconComponent={() =>
+                  history.length > 0
+                    ? <CheckCircleIcon color="success" fontSize="small" />
+                    : <CalculateIcon color={onboardingStep === 2 ? 'primary' : 'disabled'} fontSize="small" />
+                }
+              >
+                <Typography fontWeight={600}>Сделайте первый расчёт</Typography>
+              </StepLabel>
+              <StepContent>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                  Введите вес детали (или загрузите G-code), выберите профиль и нажмите «Рассчитать». Можно работать и без принтера/катушки — просто введите параметры вручную.
+                </Typography>
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<CalculateIcon />}
+                  onClick={() => { setActiveTab('calculator'); setOnboardingStep(3); }}
+                >
+                  К расчёту
+                </Button>
+              </StepContent>
+            </Step>
+          </Stepper>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            color="inherit"
+            onClick={() => { localStorage.setItem('pfdm_onboarding_done', '1'); setOnboardingOpen(false); }}
+          >
+            Пропустить
+          </Button>
+          {onboardingStep < 3 && (
+            <Button variant="outlined" onClick={() => setOnboardingStep((s) => Math.min(s + 1, 2))}>
+              Далее
+            </Button>
+          )}
+          {onboardingStep >= 2 && (
+            <Button
+              variant="contained"
+              onClick={() => { localStorage.setItem('pfdm_onboarding_done', '1'); setOnboardingOpen(false); }}
+            >
+              Начать работу
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={confirmClearForm} onClose={() => setConfirmClearForm(false)} maxWidth="xs" fullWidth>
         <DialogTitle>Очистить форму?</DialogTitle>

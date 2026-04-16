@@ -24,17 +24,19 @@ import SpoolIcon from '@mui/icons-material/Cable';
 import PrintIcon from '@mui/icons-material/Print';
 import HistoryIcon from '@mui/icons-material/History';
 import SettingsIcon from '@mui/icons-material/Settings';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import MenuIcon from '@mui/icons-material/Menu';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 
-export type AppTab = 'calculator' | 'spools' | 'printers' | 'history' | 'settings';
+export type AppTab = 'calculator' | 'spools' | 'printers' | 'history' | 'profit' | 'settings';
 
 const TABS: { id: AppTab; label: string; icon: React.ReactNode }[] = [
   { id: 'calculator', label: 'Расчёт', icon: <CalculateIcon /> },
   { id: 'spools', label: 'Катушки', icon: <SpoolIcon /> },
   { id: 'printers', label: 'Принтеры', icon: <PrintIcon /> },
   { id: 'history', label: 'История', icon: <HistoryIcon /> },
+  { id: 'profit', label: 'Прибыль', icon: <TrendingUpIcon /> },
   { id: 'settings', label: 'Настройки', icon: <SettingsIcon /> },
 ];
 

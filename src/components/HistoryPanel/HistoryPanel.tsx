@@ -24,6 +24,8 @@ import {
   Select,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from '@mui/material';
@@ -37,11 +39,197 @@ import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import FolderIcon from '@mui/icons-material/Folder';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import SortIcon from '@mui/icons-material/Sort';
+import ArticleIcon from '@mui/icons-material/Article';
+import CommentIcon from '@mui/icons-material/Comment';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import PrintIcon from '@mui/icons-material/Print';
 import type { Project, SavedCalculation } from '../../types';
 
 const COLOR_PALETTE = ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#8b5cf6','#ec4899','#6b7280'];
 import { formatMoney } from '../../utils/calculations';
 import ConfirmDialog from '../common/ConfirmDialog';
+
+// ─── Кошт-лист: вспомогательные функции ─────────────────────────────────────
+
+const fmtCost = (v: number) =>
+  v.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₽';
+
+const generateCostSheetText = (item: SavedCalculation): string => {
+  const pricePerPiece =
+    item.result.roundingEnabled && item.result.pricePerPieceRounded !== null
+      ? item.result.pricePerPieceRounded : item.result.pricePerPiece;
+  const totalPrice =
+    item.result.roundingEnabled && item.result.totalPriceRounded !== null
+      ? item.result.totalPriceRounded : item.result.totalPrice;
+  const h = Math.floor(item.result.printTimeHours);
+  const m = Math.round((item.result.printTimeHours - h) * 60);
+  const timeLabel = [h > 0 ? `${h} ч` : '', m > 0 ? `${m} мин` : ''].filter(Boolean).join(' ') || '—';
+  let text = `=== ${item.input.partName || 'Изделие'} ===\n`;
+  text += `Дата: ${new Date(item.savedAt).toLocaleDateString('ru-RU')}\n`;
+  if (item.spoolName) text += `Материал: ${item.spoolName}\n`;
+  if (item.printerName) text += `Принтер: ${item.printerName}\n`;
+  text += `Вес изделия: ${item.input.partWeight} г\n`;
+  text += `Время печати: ${timeLabel}\n`;
+  text += `Количество: ${item.input.quantity} шт.\n`;
+  text += `Цена за 1 шт.: ${fmtCost(pricePerPiece)}\n`;
+  if (item.input.quantity > 1) text += `Итого: ${fmtCost(totalPrice)}\n`;
+  if (item.note) text += `\nПримечание: ${item.note}\n`;
+  return text;
+};
+
+const generateCostSheetHtml = (item: SavedCalculation): string => {
+  const pricePerPiece =
+    item.result.roundingEnabled && item.result.pricePerPieceRounded !== null
+      ? item.result.pricePerPieceRounded : item.result.pricePerPiece;
+  const totalPrice =
+    item.result.roundingEnabled && item.result.totalPriceRounded !== null
+      ? item.result.totalPriceRounded : item.result.totalPrice;
+  const h = Math.floor(item.result.printTimeHours);
+  const m = Math.round((item.result.printTimeHours - h) * 60);
+  const timeLabel = [h > 0 ? `${h} ч` : '', m > 0 ? `${m} мин` : ''].filter(Boolean).join(' ') || '—';
+  const dateStr = new Date(item.savedAt).toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' });
+  const rows = [
+    item.spoolName ? `<tr><td>Материал</td><td>${item.spoolName}</td></tr>` : '',
+    item.printerName ? `<tr><td>Принтер</td><td>${item.printerName}</td></tr>` : '',
+    `<tr><td>Вес изделия</td><td>${item.input.partWeight} г</td></tr>`,
+    `<tr><td>Время печати</td><td>${timeLabel}</td></tr>`,
+    `<tr><td>Количество</td><td>${item.input.quantity} шт.</td></tr>`,
+    `<tr><td>Цена за 1 шт.</td><td>${fmtCost(pricePerPiece)}</td></tr>`,
+    item.input.quantity > 1
+      ? `<tr class="total-row"><td>Итого (${item.input.quantity} шт.)</td><td>${fmtCost(totalPrice)}</td></tr>`
+      : '',
+  ].filter(Boolean).join('\n');
+  return `<!DOCTYPE html>
+<html lang="ru"><head><meta charset="UTF-8">
+<title>Кошт-лист: ${item.input.partName || 'Изделие'}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI',Arial,sans-serif;font-size:14px;color:#1a1a1a;padding:32px;max-width:680px;margin:0 auto}
+  h1{font-size:22px;font-weight:700;margin-bottom:4px}
+  .sub{color:#666;font-size:12px;margin-bottom:20px}
+  hr{border:none;border-top:1px solid #e0e0e0;margin:16px 0}
+  table{width:100%;border-collapse:collapse}
+  td{padding:8px 12px;vertical-align:top}
+  td:first-child{color:#666;width:45%}
+  td:last-child{font-weight:500;text-align:right}
+  .total-row td{font-size:16px;font-weight:700;border-top:2px solid #1a1a1a;padding-top:12px}
+  .note{background:#f5f5f5;border-left:3px solid #aaa;padding:10px 14px;margin-top:20px;font-style:italic;color:#555;border-radius:2px}
+  @media print{body{padding:16px}}
+</style></head><body>
+  <h1>${item.input.partName || 'Изделие'}</h1>
+  <div class="sub">Расчёт от ${dateStr}</div>
+  <hr>
+  <table>${rows}</table>
+  ${item.note ? `<div class="note">💬 ${item.note}</div>` : ''}
+</body></html>`;
+};
+
+// ─── Кошт-лист диалог ────────────────────────────────────────────────────────
+
+interface CostSheetDialogProps { item: SavedCalculation; onClose: () => void; }
+
+const CostSheetDialog: React.FC<CostSheetDialogProps> = ({ item, onClose }) => {
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(generateCostSheetText(item));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handlePrint = () => {
+    const html = generateCostSheetHtml(item);
+    const win = window.open('', '_blank', 'width=750,height=650');
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+      setTimeout(() => { win.print(); }, 600);
+    }
+  };
+
+  const pricePerPiece =
+    item.result.roundingEnabled && item.result.pricePerPieceRounded !== null
+      ? item.result.pricePerPieceRounded : item.result.pricePerPiece;
+  const totalPrice =
+    item.result.roundingEnabled && item.result.totalPriceRounded !== null
+      ? item.result.totalPriceRounded : item.result.totalPrice;
+  const h = Math.floor(item.result.printTimeHours);
+  const mn = Math.round((item.result.printTimeHours - h) * 60);
+  const timeLabel = [h > 0 ? `${h} ч` : '', mn > 0 ? `${mn} мин` : ''].filter(Boolean).join(' ') || '—';
+
+  return (
+    <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <ArticleIcon color="primary" />
+          <span>Кошт-лист</span>
+        </Stack>
+      </DialogTitle>
+      <DialogContent>
+        <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 2.5 }}>
+          <Typography variant="h6" fontWeight={700}>{item.input.partName || 'Изделие'}</Typography>
+          <Typography variant="caption" color="text.secondary">
+            {new Date(item.savedAt).toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' })}
+          </Typography>
+          <Divider sx={{ my: 1.5 }} />
+          <Stack spacing={0.75}>
+            {item.spoolName && (
+              <Stack direction="row" justifyContent="space-between">
+                <Typography variant="body2" color="text.secondary">Материал</Typography>
+                <Typography variant="body2">{item.spoolName}</Typography>
+              </Stack>
+            )}
+            {item.printerName && (
+              <Stack direction="row" justifyContent="space-between">
+                <Typography variant="body2" color="text.secondary">Принтер</Typography>
+                <Typography variant="body2">{item.printerName}</Typography>
+              </Stack>
+            )}
+            <Stack direction="row" justifyContent="space-between">
+              <Typography variant="body2" color="text.secondary">Вес изделия</Typography>
+              <Typography variant="body2">{item.input.partWeight} г</Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between">
+              <Typography variant="body2" color="text.secondary">Время печати</Typography>
+              <Typography variant="body2">{timeLabel}</Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between">
+              <Typography variant="body2" color="text.secondary">Количество</Typography>
+              <Typography variant="body2">{item.input.quantity} шт.</Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between">
+              <Typography variant="body2" color="text.secondary">Цена за 1 шт.</Typography>
+              <Typography variant="body2" fontWeight={600}>{fmtCost(pricePerPiece)}</Typography>
+            </Stack>
+            {item.input.quantity > 1 && (
+              <Stack direction="row" justifyContent="space-between"
+                sx={{ pt: 1, borderTop: '2px solid', borderColor: 'text.primary' }}>
+                <Typography fontWeight={700}>Итого ({item.input.quantity} шт.)</Typography>
+                <Typography fontWeight={700} color="primary">{fmtCost(totalPrice)}</Typography>
+              </Stack>
+            )}
+          </Stack>
+          {item.note && (
+            <Box sx={{ mt: 2, p: 1.5, bgcolor: 'action.hover', borderLeft: '3px solid', borderColor: 'text.disabled', borderRadius: '0 4px 4px 0' }}>
+              <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>💬 {item.note}</Typography>
+            </Box>
+          )}
+        </Box>
+      </DialogContent>
+      <DialogActions>
+        <Tooltip title={copied ? 'Скопировано!' : 'Скопировать текст'}>
+          <Button startIcon={<ContentCopyIcon />} onClick={handleCopy} color={copied ? 'success' : 'inherit'}>
+            {copied ? 'Скопировано' : 'Копировать'}
+          </Button>
+        </Tooltip>
+        <Button startIcon={<PrintIcon />} variant="outlined" onClick={handlePrint}>Распечатать</Button>
+        <Button onClick={onClose}>Закрыть</Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
 
 // --- HistoryItem -----------------------------------------------------------
 interface HistoryItemProps {
@@ -50,11 +238,25 @@ interface HistoryItemProps {
   onLoad: (item: SavedCalculation) => void;
   onDelete: (id: string) => void;
   onSetProjectIds: (calcId: string, projectIds: string[]) => void;
+  onAddToProfit: (item: SavedCalculation) => void;
+  onUpdateNote: (id: string, note: string) => void;
 }
 
-const HistoryItem: React.FC<HistoryItemProps> = ({ item, projects, onLoad, onDelete, onSetProjectIds }) => {
+const HistoryItem: React.FC<HistoryItemProps> = ({ item, projects, onLoad, onDelete, onSetProjectIds, onAddToProfit, onUpdateNote }) => {
   const [expanded, setExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [costSheetOpen, setCostSheetOpen] = useState(false);
+  const [noteEditing, setNoteEditing] = useState(false);
+  const [noteValue, setNoteValue] = useState(item.note ?? '');
+
+  React.useEffect(() => {
+    if (!noteEditing) setNoteValue(item.note ?? '');
+  }, [item.note, noteEditing]);
+
+  const handleNoteSave = () => {
+    onUpdateNote(item.id, noteValue.trim());
+    setNoteEditing(false);
+  };
 
   const date = new Date(item.savedAt);
   const dateStr = date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -152,6 +354,21 @@ const HistoryItem: React.FC<HistoryItemProps> = ({ item, projects, onLoad, onDel
                 <RestoreIcon fontSize="small" />
               </IconButton>
             </Tooltip>
+            <Tooltip title="Добавить в таблицу прибыли">
+              <IconButton size="small" color="success" onClick={() => onAddToProfit(item)}>
+                <TrendingUpIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Кошт-лист (для заказчика)">
+              <IconButton size="small" onClick={() => setCostSheetOpen(true)}>
+                <ArticleIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title={item.note ? 'Редактировать комментарий' : 'Добавить комментарий'}>
+              <IconButton size="small" color={item.note ? 'primary' : 'default'} onClick={() => setNoteEditing(true)}>
+                <CommentIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
             <Tooltip title="Удалить">
               <IconButton size="small" color="error" onClick={() => setConfirmDelete(true)}>
                 <DeleteIcon fontSize="small" />
@@ -223,6 +440,40 @@ const HistoryItem: React.FC<HistoryItemProps> = ({ item, projects, onLoad, onDel
             </Grid>
           </Grid>
         </Collapse>
+
+        {/* ── Комментарий ────────────────────────────────────────────── */}
+        {noteEditing ? (
+          <Stack direction="row" spacing={1} mt={1} alignItems="flex-start">
+            <TextField
+              size="small"
+              fullWidth
+              multiline
+              maxRows={3}
+              placeholder="Комментарий к расчёту (Ctrl+Enter — сохранить, Esc — отмена)..."
+              value={noteValue}
+              onChange={(e) => setNoteValue(e.target.value)}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleNoteSave();
+                if (e.key === 'Escape') { setNoteValue(item.note ?? ''); setNoteEditing(false); }
+              }}
+            />
+            <Stack spacing={0.5} flexShrink={0}>
+              <Button size="small" variant="contained" sx={{ py: 0.5, minWidth: 52 }} onClick={handleNoteSave}>ОК</Button>
+              <Button size="small" sx={{ py: 0.5, minWidth: 52 }} onClick={() => { setNoteValue(item.note ?? ''); setNoteEditing(false); }}>✕</Button>
+            </Stack>
+          </Stack>
+        ) : item.note ? (
+          <Stack direction="row" alignItems="flex-start" mt={0.75} spacing={0.5}
+            onClick={() => setNoteEditing(true)}
+            sx={{ cursor: 'pointer', opacity: 0.7, '&:hover': { opacity: 1 }, transition: 'opacity 0.15s' }}
+          >
+            <CommentIcon sx={{ fontSize: 13, color: 'text.secondary', mt: 0.25, flexShrink: 0 }} />
+            <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+              {item.note}
+            </Typography>
+          </Stack>
+        ) : null}
       </CardContent>
 
       <ConfirmDialog
@@ -234,6 +485,7 @@ const HistoryItem: React.FC<HistoryItemProps> = ({ item, projects, onLoad, onDel
         onCancel={() => setConfirmDelete(false)}
         danger
       />
+      {costSheetOpen && <CostSheetDialog item={item} onClose={() => setCostSheetOpen(false)} />}
     </Card>
   );
 };
@@ -249,10 +501,12 @@ interface ProjectSectionProps {
   onRename: (id: string, name: string) => void;
   onDeleteProject: (id: string) => void;
   onUpdateProject: (id: string, changes: Partial<Project>) => void;
+  onAddToProfit: (item: SavedCalculation) => void;
+  onUpdateNote: (id: string, note: string) => void;
 }
 
 const ProjectSection: React.FC<ProjectSectionProps> = ({
-  project, items, allProjects, onLoad, onDelete, onSetProjectIds, onRename, onDeleteProject, onUpdateProject,
+  project, items, allProjects, onLoad, onDelete, onSetProjectIds, onRename, onDeleteProject, onUpdateProject, onAddToProfit, onUpdateNote,
 }) => {
   const [renameOpen, setRenameOpen] = useState(false);
   const [newName, setNewName] = useState(project.name);
@@ -373,7 +627,8 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
             <Stack spacing={1.5}>
               {items.map((item) => (
                 <HistoryItem key={item.id} item={item} projects={allProjects}
-                  onLoad={onLoad} onDelete={onDelete} onSetProjectIds={onSetProjectIds} />
+                  onLoad={onLoad} onDelete={onDelete} onSetProjectIds={onSetProjectIds}
+                  onAddToProfit={onAddToProfit} onUpdateNote={onUpdateNote} />
               ))}
             </Stack>
           )}
@@ -419,16 +674,19 @@ interface Props {
   onRenameProject: (id: string, name: string) => void;
   onSetProjectIds: (calcId: string, projectIds: string[]) => void;
   onUpdateProject: (id: string, changes: Partial<Project>) => void;
+  onAddToProfit: (item: SavedCalculation) => void;
+  onUpdateNote: (id: string, note: string) => void;
 }
 
 const HistoryPanel: React.FC<Props> = ({
   history, projects, onLoad, onDelete, onClearAll,
-  onCreateProject, onDeleteProject, onRenameProject, onSetProjectIds, onUpdateProject,
+  onCreateProject, onDeleteProject, onRenameProject, onSetProjectIds, onUpdateProject, onAddToProfit, onUpdateNote,
 }) => {
   const [confirmClear, setConfirmClear] = useState(false);
   const [search, setSearch] = useState('');
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
+  const [sortMode, setSortMode] = useState<'date' | 'price' | 'name'>('date');
 
   const handleCreateProject = () => {
     if (newProjectName.trim()) {
@@ -448,9 +706,20 @@ const HistoryPanel: React.FC<Props> = ({
       )
     : history;
 
-  const sorted = [...filtered].sort(
-    (a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime()
-  );
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortMode === 'date') {
+      return new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime();
+    }
+    if (sortMode === 'price') {
+      const priceA = a.result.roundingEnabled && a.result.totalPriceRounded !== null
+        ? a.result.totalPriceRounded : a.result.totalPrice;
+      const priceB = b.result.roundingEnabled && b.result.totalPriceRounded !== null
+        ? b.result.totalPriceRounded : b.result.totalPrice;
+      return priceB - priceA;
+    }
+    // name
+    return (a.input.partName ?? '').localeCompare(b.input.partName ?? '', 'ru');
+  });
 
   const ungrouped = sorted.filter((h) => !h.projectIds || h.projectIds.length === 0);
   const grouped = projects.map((p) => ({
@@ -489,14 +758,34 @@ const HistoryPanel: React.FC<Props> = ({
       </Stack>
 
       {history.length > 0 && (
-        <TextField
-          fullWidth size="small"
-          placeholder="Поиск по названию, катушке, принтеру..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          InputProps={{ startAdornment: <SearchIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} /> }}
-          sx={{ mb: 2 }}
-        />
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} mb={2} alignItems={{ sm: 'center' }}>
+          <TextField
+            fullWidth size="small"
+            placeholder="Поиск по названию, катушке, принтеру..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            InputProps={{ startAdornment: <SearchIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} /> }}
+          />
+          <Stack direction="row" alignItems="center" spacing={0.5} flexShrink={0}>
+            <SortIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+            <ToggleButtonGroup
+              value={sortMode}
+              exclusive
+              onChange={(_, v) => v && setSortMode(v)}
+              size="small"
+            >
+              <ToggleButton value="date" sx={{ px: 1.5, py: 0.5, fontSize: '0.75rem' }}>
+                По дате
+              </ToggleButton>
+              <ToggleButton value="price" sx={{ px: 1.5, py: 0.5, fontSize: '0.75rem' }}>
+                По цене
+              </ToggleButton>
+              <ToggleButton value="name" sx={{ px: 1.5, py: 0.5, fontSize: '0.75rem' }}>
+                По имени
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Stack>
+        </Stack>
       )}
 
       {history.length === 0 && projects.length === 0 ? (
@@ -522,6 +811,8 @@ const HistoryPanel: React.FC<Props> = ({
                 onRename={onRenameProject}
                 onDeleteProject={onDeleteProject}
                 onUpdateProject={onUpdateProject}
+                onAddToProfit={onAddToProfit}
+                onUpdateNote={onUpdateNote}
               />
             ) : null
           ))}
@@ -539,7 +830,8 @@ const HistoryPanel: React.FC<Props> = ({
               )}
               {ungrouped.map((item) => (
                 <HistoryItem key={item.id} item={item} projects={projects}
-                  onLoad={onLoad} onDelete={onDelete} onSetProjectIds={onSetProjectIds} />
+                  onLoad={onLoad} onDelete={onDelete} onSetProjectIds={onSetProjectIds}
+                  onAddToProfit={onAddToProfit} onUpdateNote={onUpdateNote} />
               ))}
             </>
           ) : null}
