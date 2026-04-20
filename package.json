@@ -1,7 +1,7 @@
 {
   "name": "pricefdm",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Калькулятор себестоимости 3D-печати",
   "author": "JustAGuyFromTheZoo aka RedStyle",
   "type": "module",
@@ -13,8 +13,8 @@
     "preview": "vite preview",
     "electron:start": "wait-on http://127.0.0.1:5173 -- electron .",
     "electron:dev": "concurrently -k \"npm:dev\" \"npm:electron:start\"",
-    "electron:build": "vite build && electron-builder",
-    "electron:build:mac": "vite build && electron-builder --mac"
+    "electron:build": "tsc -b && vite build && electron-builder",
+    "electron:build:mac": "tsc -b && vite build && electron-builder --mac"
   },
   "build": {
     "appId": "com.pricefdm.app",
