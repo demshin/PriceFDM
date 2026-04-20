@@ -318,6 +318,30 @@ const App: React.FC = () => {
     setSnackbar({ open: true, message: `«${entry.label}» добавлено в таблицу прибыли`, severity: 'success' });
   }, []);
 
+  const handleAddProjectToProfit = useCallback((projectName: string, items: SavedCalculation[]) => {
+    if (items.length === 0) return;
+    const entries: ProfitEntry[] = items.map((item) => {
+      const { result, input: inp } = item;
+      const baseCostPerPiece = result.materialCost + result.electricityCost + result.wearCostRaw;
+      const salePricePerPiece =
+        result.roundingEnabled && result.pricePerPieceRounded !== null
+          ? result.pricePerPieceRounded
+          : result.pricePerPiece;
+      return {
+        id: generateId(),
+        createdAt: new Date().toISOString(),
+        label: inp.partName || 'Без названия',
+        quantity: inp.quantity ?? 1,
+        baseCostPerPiece,
+        salePricePerPiece,
+        calculationId: item.id,
+      };
+    });
+    setProfitEntries((prev) => [...prev, ...entries]);
+    setActiveTab('profit');
+    setSnackbar({ open: true, message: `Проект «${projectName}»: ${entries.length} позиций добавлено в таблицу прибыли`, severity: 'success' });
+  }, []);
+
   const hasResult = input.partWeight > 0 || input.printHours > 0 || input.printMinutes > 0;
 
   const theme = useMemo(() => getTheme(settings.colorMode), [settings.colorMode]);
@@ -455,6 +479,7 @@ const App: React.FC = () => {
               onSetProjectIds={handleSetProjectIds}
               onUpdateProject={handleUpdateProject}
               onAddToProfit={handleAddToProfit}
+              onAddProjectToProfit={handleAddProjectToProfit}
               onUpdateNote={handleUpdateNote}
             />
           </Paper>

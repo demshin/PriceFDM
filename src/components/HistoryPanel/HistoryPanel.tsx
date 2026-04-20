@@ -502,11 +502,12 @@ interface ProjectSectionProps {
   onDeleteProject: (id: string) => void;
   onUpdateProject: (id: string, changes: Partial<Project>) => void;
   onAddToProfit: (item: SavedCalculation) => void;
+  onAddProjectToProfit: (projectName: string, items: SavedCalculation[]) => void;
   onUpdateNote: (id: string, note: string) => void;
 }
 
 const ProjectSection: React.FC<ProjectSectionProps> = ({
-  project, items, allProjects, onLoad, onDelete, onSetProjectIds, onRename, onDeleteProject, onUpdateProject, onAddToProfit, onUpdateNote,
+  project, items, allProjects, onLoad, onDelete, onSetProjectIds, onRename, onDeleteProject, onUpdateProject, onAddToProfit, onAddProjectToProfit, onUpdateNote,
 }) => {
   const [renameOpen, setRenameOpen] = useState(false);
   const [newName, setNewName] = useState(project.name);
@@ -581,6 +582,13 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
                   sx={{ width: 90 }}
                 />
               </Tooltip>
+              {items.length > 0 && (
+                <Tooltip title="Добавить весь проект в таблицу прибыли">
+                  <IconButton size="small" color="success" onClick={(e) => { e.stopPropagation(); onAddProjectToProfit(project.name, items); }}>
+                    <TrendingUpIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
               <Tooltip title="Переименовать проект">
                 <IconButton size="small" onClick={(e) => { e.stopPropagation(); setNewName(project.name); setRenameOpen(true); }}>
                   <EditIcon fontSize="small" />
@@ -675,12 +683,13 @@ interface Props {
   onSetProjectIds: (calcId: string, projectIds: string[]) => void;
   onUpdateProject: (id: string, changes: Partial<Project>) => void;
   onAddToProfit: (item: SavedCalculation) => void;
+  onAddProjectToProfit: (projectName: string, items: SavedCalculation[]) => void;
   onUpdateNote: (id: string, note: string) => void;
 }
 
 const HistoryPanel: React.FC<Props> = ({
   history, projects, onLoad, onDelete, onClearAll,
-  onCreateProject, onDeleteProject, onRenameProject, onSetProjectIds, onUpdateProject, onAddToProfit, onUpdateNote,
+  onCreateProject, onDeleteProject, onRenameProject, onSetProjectIds, onUpdateProject, onAddToProfit, onAddProjectToProfit, onUpdateNote,
 }) => {
   const [confirmClear, setConfirmClear] = useState(false);
   const [search, setSearch] = useState('');
@@ -812,6 +821,7 @@ const HistoryPanel: React.FC<Props> = ({
                 onDeleteProject={onDeleteProject}
                 onUpdateProject={onUpdateProject}
                 onAddToProfit={onAddToProfit}
+                onAddProjectToProfit={onAddProjectToProfit}
                 onUpdateNote={onUpdateNote}
               />
             ) : null
