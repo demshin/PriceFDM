@@ -50,6 +50,7 @@ import type { Project, SavedCalculation } from '../../types';
 const COLOR_PALETTE = ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#8b5cf6','#ec4899','#6b7280'];
 import { formatMoney } from '../../utils/calculations';
 import ConfirmDialog from '../common/ConfirmDialog';
+import { useTranslation } from '../../i18n/useTranslation';
 
 // ─── Кошт-лист: вспомогательные функции ─────────────────────────────────────
 
@@ -131,6 +132,7 @@ const generateCostSheetHtml = (item: SavedCalculation): string => {
 interface CostSheetDialogProps { item: SavedCalculation; onClose: () => void; }
 
 const CostSheetDialog: React.FC<CostSheetDialogProps> = ({ item, onClose }) => {
+  const { t } = useTranslation();
   const [copied, setCopied] = React.useState(false);
 
   const handleCopy = async () => {
@@ -164,7 +166,7 @@ const CostSheetDialog: React.FC<CostSheetDialogProps> = ({ item, onClose }) => {
       <DialogTitle>
         <Stack direction="row" alignItems="center" spacing={1}>
           <ArticleIcon color="primary" />
-          <span>Кошт-лист</span>
+          <span>{t.hist_cost_sheet}</span>
         </Stack>
       </DialogTitle>
       <DialogContent>
@@ -177,36 +179,36 @@ const CostSheetDialog: React.FC<CostSheetDialogProps> = ({ item, onClose }) => {
           <Stack spacing={0.75}>
             {item.spoolName && (
               <Stack direction="row" justifyContent="space-between">
-                <Typography variant="body2" color="text.secondary">Материал</Typography>
+                <Typography variant="body2" color="text.secondary">{t.brk_material}</Typography>
                 <Typography variant="body2">{item.spoolName}</Typography>
               </Stack>
             )}
             {item.printerName && (
               <Stack direction="row" justifyContent="space-between">
-                <Typography variant="body2" color="text.secondary">Принтер</Typography>
+                <Typography variant="body2" color="text.secondary">{t.hist_printer_label}</Typography>
                 <Typography variant="body2">{item.printerName}</Typography>
               </Stack>
             )}
             <Stack direction="row" justifyContent="space-between">
-              <Typography variant="body2" color="text.secondary">Вес изделия</Typography>
-              <Typography variant="body2">{item.input.partWeight} г</Typography>
+            <Typography variant="body2" color="text.secondary">{t.hist_part_weight}</Typography>
+                <Typography variant="body2">{item.input.partWeight} {t.common_grams}</Typography>
             </Stack>
             <Stack direction="row" justifyContent="space-between">
-              <Typography variant="body2" color="text.secondary">Время печати</Typography>
+              <Typography variant="body2" color="text.secondary">{t.calc_print_time}</Typography>
               <Typography variant="body2">{timeLabel}</Typography>
             </Stack>
             <Stack direction="row" justifyContent="space-between">
-              <Typography variant="body2" color="text.secondary">Количество</Typography>
-              <Typography variant="body2">{item.input.quantity} шт.</Typography>
+            <Typography variant="body2" color="text.secondary">{t.calc_quantity_parts}</Typography>
+                <Typography variant="body2">{item.input.quantity} {t.res_pieces}</Typography>
             </Stack>
             <Stack direction="row" justifyContent="space-between">
-              <Typography variant="body2" color="text.secondary">Цена за 1 шт.</Typography>
+              <Typography variant="body2" color="text.secondary">{t.calc_price_per_piece}</Typography>
               <Typography variant="body2" fontWeight={600}>{fmtCost(pricePerPiece)}</Typography>
             </Stack>
             {item.input.quantity > 1 && (
               <Stack direction="row" justifyContent="space-between"
                 sx={{ pt: 1, borderTop: '2px solid', borderColor: 'text.primary' }}>
-                <Typography fontWeight={700}>Итого ({item.input.quantity} шт.)</Typography>
+                <Typography fontWeight={700}>{t.res_total_for} ({item.input.quantity} {t.res_pieces})</Typography>
                 <Typography fontWeight={700} color="primary">{fmtCost(totalPrice)}</Typography>
               </Stack>
             )}
@@ -219,13 +221,13 @@ const CostSheetDialog: React.FC<CostSheetDialogProps> = ({ item, onClose }) => {
         </Box>
       </DialogContent>
       <DialogActions>
-        <Tooltip title={copied ? 'Скопировано!' : 'Скопировать текст'}>
+        <Tooltip title={copied ? t.hist_copied : t.hist_copy_text}>
           <Button startIcon={<ContentCopyIcon />} onClick={handleCopy} color={copied ? 'success' : 'inherit'}>
-            {copied ? 'Скопировано' : 'Копировать'}
+            {copied ? t.hist_copied : t.common_copy}
           </Button>
         </Tooltip>
-        <Button startIcon={<PrintIcon />} variant="outlined" onClick={handlePrint}>Распечатать</Button>
-        <Button onClick={onClose}>Закрыть</Button>
+        <Button startIcon={<PrintIcon />} variant="outlined" onClick={handlePrint}>{t.hist_print}</Button>
+        <Button onClick={onClose}>{t.common_close}</Button>
       </DialogActions>
     </Dialog>
   );
@@ -243,6 +245,7 @@ interface HistoryItemProps {
 }
 
 const HistoryItem: React.FC<HistoryItemProps> = ({ item, projects, onLoad, onDelete, onSetProjectIds, onAddToProfit, onUpdateNote }) => {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [costSheetOpen, setCostSheetOpen] = useState(false);
@@ -286,18 +289,18 @@ const HistoryItem: React.FC<HistoryItemProps> = ({ item, projects, onLoad, onDel
         <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
-              <Typography fontWeight={600} noWrap>{input.partName || 'Без названия'}</Typography>
+              <Typography fontWeight={600} noWrap>{input.partName || t.hist_no_name}</Typography>
               <Typography variant="caption" color="text.secondary">{dateStr} {timeStr}</Typography>
             </Stack>
             <Stack direction="row" spacing={1} mt={0.5} flexWrap="wrap">
               {item.spoolName && <Chip size="small" label={item.spoolName} variant="outlined" />}
               {item.printerName && <Chip size="small" label={item.printerName} variant="outlined" />}
-              <Chip size="small" label={`${input.quantity} шт.`} />
-              <Chip size="small" label={`${input.partWeight} г`} variant="outlined" />
+              <Chip size="small" label={`${input.quantity} ${t.res_pieces}`} />
+              <Chip size="small" label={`${input.partWeight} ${t.common_grams}`} variant="outlined" />
               {input.complexityCoefficient && input.complexityCoefficient > 1 && (
                 <Chip
                   size="small"
-                  label={`${input.complexityLabel ?? 'Сложность'} ×${input.complexityCoefficient}`}
+                  label={`${input.complexityLabel ?? t.calc_complexity} ×${input.complexityCoefficient}`}
                   color="primary"
                   variant="outlined"
                 />
@@ -306,10 +309,10 @@ const HistoryItem: React.FC<HistoryItemProps> = ({ item, projects, onLoad, onDel
           </Box>
           <Stack alignItems="flex-end" spacing={0.5} flexShrink={0}>
             <Typography fontWeight={700} color="primary">{formatMoney(pricePerPiece)}</Typography>
-            <Typography variant="caption" color="text.secondary">за 1 шт.</Typography>
+            <Typography variant="caption" color="text.secondary">{t.calc_price_per_piece}</Typography>
             {input.quantity > 1 && (
               <Typography variant="body2" fontWeight={600} color="success.main">
-                {formatMoney(totalPrice)} всего
+                {formatMoney(totalPrice)} {t.res_total_short}
               </Typography>
             )}
           </Stack>
@@ -321,7 +324,7 @@ const HistoryItem: React.FC<HistoryItemProps> = ({ item, projects, onLoad, onDel
             startIcon={expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
             onClick={() => setExpanded(!expanded)}
           >
-            {expanded ? 'Скрыть детали' : 'Показать детали'}
+            {expanded ? t.hist_hide_details : t.hist_show_details}
           </Button>
           <Stack direction="row" spacing={0.5} alignItems="center">
             {projects.length > 0 && (
@@ -333,10 +336,10 @@ const HistoryItem: React.FC<HistoryItemProps> = ({ item, projects, onLoad, onDel
                 input={<OutlinedInput />}
                 renderValue={(sel: string[]) =>
                   sel.length === 0
-                    ? 'Без проекта'
+                    ? t.hist_no_project
                     : sel.length === 1
-                    ? (projects.find((p) => p.id === sel[0])?.name ?? '1 проект')
-                    : `${sel.length} проекта`
+                    ? (projects.find((p) => p.id === sel[0])?.name ?? t.hist_one_project)
+                    : `${sel.length} ${t.hist_projects_n}`
                 }
                 displayEmpty
                 sx={{ fontSize: '0.75rem', height: 28, minWidth: 130 }}
@@ -383,26 +386,26 @@ const HistoryItem: React.FC<HistoryItemProps> = ({ item, projects, onLoad, onDel
             <Grid size={{ xs: 12, sm: 6 }}>
               <Stack spacing={0.5}>
                 <Stack direction="row" justifyContent="space-between">
-                  <Typography variant="caption" color="text.secondary">Материал</Typography>
+                  <Typography variant="caption" color="text.secondary">{t.brk_material}</Typography>
                   <Typography variant="caption">{formatMoney(result.materialCost)}</Typography>
                 </Stack>
                 <Stack direction="row" justifyContent="space-between">
-                  <Typography variant="caption" color="text.secondary">Электроэнергия</Typography>
+                  <Typography variant="caption" color="text.secondary">{t.brk_electricity}</Typography>
                   <Typography variant="caption">{formatMoney(result.electricityCost)}</Typography>
                 </Stack>
                 <Stack direction="row" justifyContent="space-between">
-                  <Typography variant="caption" color="text.secondary">Износ принтера</Typography>
+                  <Typography variant="caption" color="text.secondary">{t.brk_printer_wear}</Typography>
                   <Typography variant="caption">{formatMoney(result.wearCost)}</Typography>
                 </Stack>
                 {result.processingCost > 0 && (
                   <Stack direction="row" justifyContent="space-between">
-                    <Typography variant="caption" color="text.secondary">Обработка</Typography>
+                    <Typography variant="caption" color="text.secondary">{t.brk_processing}</Typography>
                     <Typography variant="caption">{formatMoney(result.processingCost)}</Typography>
                   </Stack>
                 )}
                 {result.extraCost > 0 && (
                   <Stack direction="row" justifyContent="space-between">
-                    <Typography variant="caption" color="text.secondary">Доп. расходы</Typography>
+                    <Typography variant="caption" color="text.secondary">{t.brk_extra}</Typography>
                     <Typography variant="caption">{formatMoney(result.extraCost)}</Typography>
                   </Stack>
                 )}
@@ -411,24 +414,24 @@ const HistoryItem: React.FC<HistoryItemProps> = ({ item, projects, onLoad, onDel
             <Grid size={{ xs: 12, sm: 6 }}>
               <Stack spacing={0.5}>
                 <Stack direction="row" justifyContent="space-between">
-                  <Typography variant="caption" color="text.secondary">Себестоимость</Typography>
+                  <Typography variant="caption" color="text.secondary">{t.calc_cost_price}</Typography>
                   <Typography variant="caption" fontWeight={600}>{formatMoney(result.costPrice)}</Typography>
                 </Stack>
                 <Stack direction="row" justifyContent="space-between">
                   <Typography variant="caption" color="text.secondary">
-                    Прибыль {result.profitMode === 'percent' ? `(${result.profitValue}%)` : '(фикс.)'}
+                    {t.res_profit} {result.profitMode === 'percent' ? `(${result.profitValue}%)` : `(${t.hist_fixed_short})`}
                   </Typography>
                   <Typography variant="caption" color="success.main" fontWeight={600}>
                     +{formatMoney(result.profit)}
                   </Typography>
                 </Stack>
                 <Stack direction="row" justifyContent="space-between">
-                  <Typography variant="caption" color="text.secondary">Время печати</Typography>
+                  <Typography variant="caption" color="text.secondary">{t.calc_print_time}</Typography>
                   <Typography variant="caption">{timeLabel}</Typography>
                 </Stack>
                 {result.processingItems.length > 0 && (
                   <Box>
-                    <Typography variant="caption" color="text.secondary">Этапы обработки:</Typography>
+                    <Typography variant="caption" color="text.secondary">{t.brk_processing}:</Typography>
                     {result.processingItems.map((pi) => (
                       <Typography key={pi.id} variant="caption" color="text.secondary" sx={{ display: 'block', pl: 1 }}>
                         · {pi.name}: {formatMoney(pi.cost)}
@@ -449,7 +452,7 @@ const HistoryItem: React.FC<HistoryItemProps> = ({ item, projects, onLoad, onDel
               fullWidth
               multiline
               maxRows={3}
-              placeholder="Комментарий к расчёту (Ctrl+Enter — сохранить, Esc — отмена)..."
+              placeholder={t.hist_note_placeholder}
               value={noteValue}
               onChange={(e) => setNoteValue(e.target.value)}
               autoFocus
@@ -478,9 +481,9 @@ const HistoryItem: React.FC<HistoryItemProps> = ({ item, projects, onLoad, onDel
 
       <ConfirmDialog
         open={confirmDelete}
-        title="Удалить расчёт?"
-        message={`Расчёт «${input.partName || 'Без названия'}» от ${dateStr} будет удалён.`}
-        confirmLabel="Удалить"
+        title={t.common_confirm_delete}
+        message={`${t.hist_confirm_delete_msg} «${input.partName || t.hist_no_name}» ${t.hist_from_date} ${dateStr}.`}
+        confirmLabel={t.common_delete}
         onConfirm={() => { onDelete(item.id); setConfirmDelete(false); }}
         onCancel={() => setConfirmDelete(false)}
         danger
@@ -509,6 +512,7 @@ interface ProjectSectionProps {
 const ProjectSection: React.FC<ProjectSectionProps> = ({
   project, items, allProjects, onLoad, onDelete, onSetProjectIds, onRename, onDeleteProject, onUpdateProject, onAddToProfit, onAddProjectToProfit, onUpdateNote,
 }) => {
+  const { t } = useTranslation();
   const [renameOpen, setRenameOpen] = useState(false);
   const [newName, setNewName] = useState(project.name);
   const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
@@ -560,18 +564,18 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
                 </Typography>
               )}
               {adjustedTotal !== null && (
-                <Tooltip title={`С учётом ${defectRate}% брака`}>
+                <Tooltip title={`${t.hist_defect_rate}: ${defectRate}%`}>
                   <Typography variant="caption" color="warning.main" fontWeight={600}>
-                    ≈{formatMoney(adjustedTotal)} с браком
+                    ≈{formatMoney(adjustedTotal)} {t.hist_adjusted_price}
                   </Typography>
                 </Tooltip>
               )}
             </Stack>
             <Stack direction="row" spacing={0.5} alignItems="center">
               {/* Процент брака */}
-              <Tooltip title="Ожидаемый % неудачных печатей">
+              <Tooltip title={t.hist_defect_rate}>
                 <TextField
-                  label="% брака"
+                  label={t.hist_defect_rate}
                   type="number"
                   size="small"
                   value={defectRate || ''}
@@ -583,18 +587,18 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
                 />
               </Tooltip>
               {items.length > 0 && (
-                <Tooltip title="Добавить весь проект в таблицу прибыли">
+                <Tooltip title={t.hist_add_to_profit}>
                   <IconButton size="small" color="success" onClick={(e) => { e.stopPropagation(); onAddProjectToProfit(project.name, items); }}>
                     <TrendingUpIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
               )}
-              <Tooltip title="Переименовать проект">
+              <Tooltip title={t.common_edit}>
                 <IconButton size="small" onClick={(e) => { e.stopPropagation(); setNewName(project.name); setRenameOpen(true); }}>
                   <EditIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
-              <Tooltip title="Удалить проект (расчёты останутся)">
+              <Tooltip title={t.common_delete}>
                 <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); setConfirmDeleteProject(true); }}>
                   <DeleteIcon fontSize="small" />
                 </IconButton>
@@ -630,7 +634,7 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
         </Popover>
         <AccordionDetails sx={{ pt: 0 }}>
           {items.length === 0 ? (
-            <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>В проекте нет расчётов</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>{t.hist_empty_desc}</Typography>
           ) : (
             <Stack spacing={1.5}>
               {items.map((item) => (
@@ -644,24 +648,24 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
       </Accordion>
 
       <Dialog open={renameOpen} onClose={() => setRenameOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Переименовать проект</DialogTitle>
+        <DialogTitle>{t.hist_rename_project}</DialogTitle>
         <DialogContent>
-          <TextField autoFocus fullWidth size="small" label="Название проекта" value={newName}
+          <TextField autoFocus fullWidth size="small" label={t.hist_project_name} value={newName}
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleRenameConfirm(); }}
             sx={{ mt: 1 }} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setRenameOpen(false)}>Отмена</Button>
-          <Button variant="contained" onClick={handleRenameConfirm} disabled={!newName.trim()}>Сохранить</Button>
+          <Button onClick={() => setRenameOpen(false)}>{t.common_cancel}</Button>
+          <Button variant="contained" onClick={handleRenameConfirm} disabled={!newName.trim()}>{t.common_save}</Button>
         </DialogActions>
       </Dialog>
 
       <ConfirmDialog
         open={confirmDeleteProject}
-        title="Удалить проект?"
-        message={`Проект «${project.name}» будет удалён. Расчёты останутся в истории без проекта.`}
-        confirmLabel="Удалить"
+        title={t.common_confirm_delete}
+        message={`${t.hist_project_delete_msg} «${project.name}».`}
+        confirmLabel={t.common_delete}
         onConfirm={() => { onDeleteProject(project.id); setConfirmDeleteProject(false); }}
         onCancel={() => setConfirmDeleteProject(false)}
         danger
@@ -691,6 +695,7 @@ const HistoryPanel: React.FC<Props> = ({
   history, projects, onLoad, onDelete, onClearAll,
   onCreateProject, onDeleteProject, onRenameProject, onSetProjectIds, onUpdateProject, onAddToProfit, onAddProjectToProfit, onUpdateNote,
 }) => {
+  const { t } = useTranslation();
   const [confirmClear, setConfirmClear] = useState(false);
   const [search, setSearch] = useState('');
   const [newProjectOpen, setNewProjectOpen] = useState(false);
@@ -741,10 +746,10 @@ const HistoryPanel: React.FC<Props> = ({
     <Box>
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2} flexWrap="wrap" gap={1}>
         <Typography variant="h6">
-          История расчётов
+          {t.hist_title}
           {history.length > 0 && (
             <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-              ({history.length} шт.)
+              ({history.length} {t.res_pieces})
             </Typography>
           )}
         </Typography>
@@ -755,12 +760,12 @@ const HistoryPanel: React.FC<Props> = ({
             startIcon={<AddIcon />}
             onClick={() => { setNewProjectName(''); setNewProjectOpen(true); }}
           >
-            Новый проект
+            {t.hist_new_project}
           </Button>
           {history.length > 0 && (
             <Button variant="outlined" color="error" size="small" startIcon={<DeleteSweepIcon />}
               onClick={() => setConfirmClear(true)}>
-              Очистить всё
+              {t.hist_clear_all}
             </Button>
           )}
         </Stack>
@@ -770,7 +775,7 @@ const HistoryPanel: React.FC<Props> = ({
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} mb={2} alignItems={{ sm: 'center' }}>
           <TextField
             fullWidth size="small"
-            placeholder="Поиск по названию, катушке, принтеру..."
+            placeholder={t.hist_search}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             InputProps={{ startAdornment: <SearchIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} /> }}
@@ -784,13 +789,13 @@ const HistoryPanel: React.FC<Props> = ({
               size="small"
             >
               <ToggleButton value="date" sx={{ px: 1.5, py: 0.5, fontSize: '0.75rem' }}>
-                По дате
+                {t.hist_by_date}
               </ToggleButton>
               <ToggleButton value="price" sx={{ px: 1.5, py: 0.5, fontSize: '0.75rem' }}>
-                По цене
+                {t.hist_by_price}
               </ToggleButton>
               <ToggleButton value="name" sx={{ px: 1.5, py: 0.5, fontSize: '0.75rem' }}>
-                По имени
+                {t.hist_by_name}
               </ToggleButton>
             </ToggleButtonGroup>
           </Stack>
@@ -799,7 +804,7 @@ const HistoryPanel: React.FC<Props> = ({
 
       {history.length === 0 && projects.length === 0 ? (
         <Box sx={{ py: 6, textAlign: 'center', border: '2px dashed', borderColor: 'divider', borderRadius: 2 }}>
-          <Typography color="text.secondary">История пуста. Сохраните расчёт из вкладки «Расчёт».</Typography>
+          <Typography color="text.secondary">{t.hist_empty}</Typography>
         </Box>
       ) : filtered.length === 0 && projects.length === 0 ? (
         <Box sx={{ py: 4, textAlign: 'center' }}>
@@ -829,13 +834,13 @@ const HistoryPanel: React.FC<Props> = ({
 
           {filtered.length === 0 && q ? (
             <Box sx={{ py: 4, textAlign: 'center' }}>
-              <Typography color="text.secondary">Ничего не найдено по запросу «{search}»</Typography>
+              <Typography color="text.secondary">{t.hist_not_found} «{search}»</Typography>
             </Box>
           ) : ungrouped.length > 0 ? (
             <>
               {hasAnyGroupedItems && (
                 <Divider>
-                  <Typography variant="caption" color="text.secondary">Без проекта</Typography>
+                  <Typography variant="caption" color="text.secondary">{t.hist_no_project}</Typography>
                 </Divider>
               )}
               {ungrouped.map((item) => (
@@ -850,9 +855,9 @@ const HistoryPanel: React.FC<Props> = ({
 
       <ConfirmDialog
         open={confirmClear}
-        title="Очистить историю?"
-        message="Все сохранённые расчёты будут удалены без возможности восстановления."
-        confirmLabel="Очистить"
+        title={t.hist_delete_all_title}
+        message={t.hist_delete_all_msg}
+        confirmLabel={t.hist_clear_all}
         onConfirm={() => { onClearAll(); setConfirmClear(false); }}
         onCancel={() => setConfirmClear(false)}
         danger
@@ -862,13 +867,13 @@ const HistoryPanel: React.FC<Props> = ({
         <DialogTitle>
           <Stack direction="row" alignItems="center" spacing={1}>
             <FolderOpenIcon color="primary" />
-            <span>Новый проект</span>
+            <span>{t.hist_new_project}</span>
           </Stack>
         </DialogTitle>
         <DialogContent>
           <TextField
             autoFocus fullWidth size="small"
-            label="Название проекта"
+            label={t.hist_project_name}
             value={newProjectName}
             onChange={(e) => setNewProjectName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleCreateProject(); }}
@@ -876,9 +881,9 @@ const HistoryPanel: React.FC<Props> = ({
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setNewProjectOpen(false)}>Отмена</Button>
+          <Button onClick={() => setNewProjectOpen(false)}>{t.common_cancel}</Button>
           <Button variant="contained" onClick={handleCreateProject} disabled={!newProjectName.trim()}>
-            Создать
+            {t.common_create}
           </Button>
         </DialogActions>
       </Dialog>

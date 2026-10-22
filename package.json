@@ -1,7 +1,7 @@
 {
   "name": "pricefdm",
   "private": true,
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "Калькулятор себестоимости 3D-печати",
   "author": "JustAGuyFromTheZoo aka RedStyle",
   "type": "module",
@@ -14,7 +14,13 @@
     "electron:start": "wait-on http://127.0.0.1:5173 -- electron .",
     "electron:dev": "concurrently -k \"npm:dev\" \"npm:electron:start\"",
     "electron:build": "tsc -b && vite build && electron-builder",
-    "electron:build:mac": "tsc -b && vite build && electron-builder --mac"
+    "electron:build:mac": "tsc -b && vite build && electron-builder --mac",
+    "cap:sync": "npx cap sync",
+    "cap:build": "npm run build && npx cap sync",
+    "cap:open:ios": "npx cap open ios",
+    "cap:open:android": "npx cap open android",
+    "cap:run:ios": "npx cap run ios",
+    "cap:run:android": "npx cap run android"
   },
   "build": {
     "appId": "com.pricefdm.app",
@@ -41,7 +47,10 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "icon": "public/icon.png",
@@ -50,12 +59,28 @@
     "dmg": {
       "title": "PriceFDM",
       "contents": [
-        { "x": 130, "y": 220 },
-        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
       ]
     }
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/clipboard": "^8.0.1",
+    "@capacitor/core": "^8.4.0",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/ios": "^8.4.0",
+    "@capacitor/share": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.2",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.9",
@@ -66,11 +91,14 @@
     "recharts": "^3.8.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.4.0",
     "@eslint/js": "^9.39.1",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
+    "astral-regex": "^2.0.0",
     "concurrently": "^9.2.1",
     "electron": "^41.0.0",
     "electron-builder": "^26.8.1",

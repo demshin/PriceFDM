@@ -10,6 +10,7 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  Grid,
   IconButton,
   InputAdornment,
   Paper,
@@ -43,6 +44,7 @@ import { formatMoney } from '../../utils/calculations';
 import { generateId } from '../../utils/storage';
 import ConfirmDialog from '../common/ConfirmDialog';
 import NumberField from '../common/NumberField';
+import { useTranslation } from '../../i18n/useTranslation';
 
 type SortKey = 'label' | 'quantity' | 'baseCostPerPiece' | 'salePricePerPiece' | 'revenue' | 'profit';
 type SortDir = 'asc' | 'desc';
@@ -63,6 +65,7 @@ interface EntryDialogProps {
 }
 
 const EntryDialog: React.FC<EntryDialogProps> = ({ open, initial, onSave, onClose, title }) => {
+  const { t } = useTranslation();
   const [label, setLabel] = useState(initial?.label ?? '');
   const [quantity, setQuantity] = useState(initial?.quantity ?? 1);
   const [baseCost, setBaseCost] = useState(initial?.baseCostPerPiece ?? 0);
@@ -96,16 +99,16 @@ const EntryDialog: React.FC<EntryDialogProps> = ({ open, initial, onSave, onClos
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 0.5 }}>
           <TextField
-            label="Название"
+            label={t.profit_item_name}
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             size="small"
             autoFocus
             fullWidth
-            placeholder="Название детали или заказа"
+            placeholder={t.profit_item_name}
           />
           <NumberField
-            label="Количество, шт."
+            label={t.profit_item_qty}
             value={quantity}
             onChange={(v) => setQuantity(typeof v === 'number' ? v : 1)}
             min={1}
@@ -113,15 +116,15 @@ const EntryDialog: React.FC<EntryDialogProps> = ({ open, initial, onSave, onClos
             size="small"
           />
           <NumberField
-            label="Себестоимость за 1 шт., ₽"
+            label={t.profit_item_cost}
             value={baseCost}
             onChange={(v) => setBaseCost(typeof v === 'number' ? v : 0)}
             min={0}
             size="small"
-            helperText="Только материалы + электричество + износ принтера"
+            helperText={t.printers_optional_note}
           />
           <NumberField
-            label="Цена продажи за 1 шт., ₽"
+            label={t.profit_item_sale}
             value={salePrice}
             onChange={(v) => setSalePrice(typeof v === 'number' ? v : 0)}
             min={0}
@@ -130,7 +133,7 @@ const EntryDialog: React.FC<EntryDialogProps> = ({ open, initial, onSave, onClos
           {label.trim() && (
             <Paper variant="outlined" sx={{ p: 1.5, bgcolor: profit >= 0 ? 'success.main' : 'error.main', opacity: 0.9 }}>
               <Stack direction="row" justifyContent="space-between">
-                <Typography variant="body2" sx={{ color: 'white' }}>Чистая прибыль ({quantity} шт.)</Typography>
+                <Typography variant="body2" sx={{ color: 'white' }}>{t.profit_net} ({quantity} {t.res_pieces})</Typography>
                 <Typography variant="body2" fontWeight={700} sx={{ color: 'white' }}>
                   {profit >= 0 ? '+' : ''}{formatMoney(profit)}
                 </Typography>
@@ -140,8 +143,8 @@ const EntryDialog: React.FC<EntryDialogProps> = ({ open, initial, onSave, onClos
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Отмена</Button>
-        <Button variant="contained" onClick={handleSave} disabled={!label.trim()}>Сохранить</Button>
+        <Button onClick={onClose}>{t.common_cancel}</Button>
+        <Button variant="contained" onClick={handleSave} disabled={!label.trim()}>{t.common_save}</Button>
       </DialogActions>
     </Dialog>
   );
@@ -183,6 +186,7 @@ const ChartView: React.FC<{ entries: ProfitEntry[] }> = ({ entries }) => {
 // ─── Основной компонент ───────────────────────────────────────────────────────
 
 const ProfitPanel: React.FC<Props> = ({ entries, onUpdate }) => {
+  const { t } = useTranslation();
   const [addOpen, setAddOpen] = useState(false);
   const [editEntry, setEditEntry] = useState<ProfitEntry | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -262,57 +266,65 @@ const ProfitPanel: React.FC<Props> = ({ entries, onUpdate }) => {
     <Box>
       {/* ─── Шапка ───────────────────────────────────────────────────────── */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2} flexWrap="wrap" gap={1}>
-        <Typography variant="h6">Таблица прибыли</Typography>
+        <Typography variant="h6">{t.profit_title}</Typography>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
           size="small"
           onClick={() => setAddOpen(true)}
         >
-          Добавить запись
+          {t.profit_add}
         </Button>
       </Stack>
 
       {/* ─── Итоговые карточки ───────────────────────────────────────────── */}
       {entries.length > 0 && (
-        <Stack direction="row" spacing={2} mb={2} flexWrap="wrap">
-          <Card variant="outlined" sx={{ flex: 1, minWidth: 140 }}>
-            <CardContent sx={{ py: '12px !important', px: 2 }}>
-              <Typography variant="caption" color="text.secondary">Позиций / изделий</Typography>
-              <Typography variant="h6" fontWeight={700}>{entries.length} / {totalItems} шт.</Typography>
-            </CardContent>
-          </Card>
-          <Card variant="outlined" sx={{ flex: 1, minWidth: 140 }}>
-            <CardContent sx={{ py: '12px !important', px: 2 }}>
-              <Typography variant="caption" color="text.secondary">Выручка</Typography>
-              <Typography variant="h6" fontWeight={700}>{formatMoney(totalRevenue)}</Typography>
-            </CardContent>
-          </Card>
-          <Card variant="outlined" sx={{ flex: 1, minWidth: 140 }}>
-            <CardContent sx={{ py: '12px !important', px: 2 }}>
-              <Typography variant="caption" color="text.secondary">Себестоимость</Typography>
-              <Typography variant="h6" fontWeight={700}>{formatMoney(totalBaseCost)}</Typography>
-            </CardContent>
-          </Card>
-          <Card
-            variant="outlined"
-            sx={{
-              flex: 1, minWidth: 140,
-              bgcolor: totalProfit >= 0 ? 'success.main' : 'error.main',
-              color: 'white',
-            }}
-          >
-            <CardContent sx={{ py: '12px !important', px: 2 }}>
-              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>Чистая прибыль</Typography>
-              <Stack direction="row" alignItems="center" spacing={0.5}>
-                <TrendingUpIcon sx={{ fontSize: 18 }} />
-                <Typography variant="h6" fontWeight={700}>
-                  {totalProfit >= 0 ? '+' : ''}{formatMoney(totalProfit)}
-                </Typography>
-              </Stack>
-            </CardContent>
-          </Card>
-        </Stack>
+        <Grid container spacing={1.5} mb={2}>
+          <Grid size={{ xs: 6, sm: 3 }}>
+            <Card variant="outlined" sx={{ height: '100%' }}>
+              <CardContent sx={{ py: '12px !important', px: 2 }}>
+                <Typography variant="caption" color="text.secondary">{t.profit_positions}</Typography>
+                <Typography variant="h6" fontWeight={700}>{entries.length} / {totalItems} {t.res_pieces}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid size={{ xs: 6, sm: 3 }}>
+            <Card variant="outlined" sx={{ height: '100%' }}>
+              <CardContent sx={{ py: '12px !important', px: 2 }}>
+                <Typography variant="caption" color="text.secondary">{t.profit_revenue}</Typography>
+                <Typography variant="h6" fontWeight={700}>{formatMoney(totalRevenue)}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid size={{ xs: 6, sm: 3 }}>
+            <Card variant="outlined" sx={{ height: '100%' }}>
+              <CardContent sx={{ py: '12px !important', px: 2 }}>
+                <Typography variant="caption" color="text.secondary">{t.profit_cost}</Typography>
+                <Typography variant="h6" fontWeight={700}>{formatMoney(totalBaseCost)}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid size={{ xs: 6, sm: 3 }}>
+            <Card
+              variant="outlined"
+              sx={{
+                height: '100%',
+                bgcolor: totalProfit >= 0 ? 'success.main' : 'error.main',
+                color: 'white',
+              }}
+            >
+              <CardContent sx={{ py: '12px !important', px: 2 }}>
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>{t.profit_net}</Typography>
+                <Stack direction="row" alignItems="center" spacing={0.5}>
+                  <TrendingUpIcon sx={{ fontSize: 18 }} />
+                  <Typography variant="h6" fontWeight={700}>
+                    {totalProfit >= 0 ? '+' : ''}{formatMoney(totalProfit)}
+                  </Typography>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
       )}
 
       {/* ─── Пустое состояние ────────────────────────────────────────────── */}
@@ -322,12 +334,12 @@ const ProfitPanel: React.FC<Props> = ({ entries, onUpdate }) => {
           sx={{ py: 8, textAlign: 'center', borderStyle: 'dashed' }}
         >
           <TrendingUpIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
-          <Typography color="text.secondary" variant="h6">Записей пока нет</Typography>
+          <Typography color="text.secondary" variant="h6">{t.hist_no_records}</Typography>
           <Typography color="text.secondary" variant="body2" sx={{ mt: 0.5, mb: 2 }}>
-            Добавьте расчёт из истории кнопкой «В прибыль» или создайте запись вручную
+            {t.profit_empty_desc}
           </Typography>
           <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setAddOpen(true)}>
-            Добавить вручную
+            {t.profit_add}
           </Button>
         </Paper>
       ) : (
@@ -339,13 +351,13 @@ const ProfitPanel: React.FC<Props> = ({ entries, onUpdate }) => {
               onChange={(_, v) => setActiveTab(v)}
               sx={{ minHeight: 36, '& .MuiTab-root': { minHeight: 36, py: 0.5 } }}
             >
-              <Tab icon={<TableChartIcon fontSize="small" />} iconPosition="start" label="Таблица" value={0} />
-              <Tab icon={<BarChartIcon fontSize="small" />} iconPosition="start" label="График" value={1} />
+              <Tab icon={<TableChartIcon fontSize="small" />} iconPosition="start" label={t.profit_table} value={0} />
+              <Tab icon={<BarChartIcon fontSize="small" />} iconPosition="start" label={t.profit_chart} value={1} />
             </Tabs>
             {activeTab === 0 && (
               <TextField
                 size="small"
-                placeholder="Поиск по названию..."
+                  placeholder={t.hist_search_placeholder}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 InputProps={{
@@ -366,7 +378,7 @@ const ProfitPanel: React.FC<Props> = ({ entries, onUpdate }) => {
             <>
               {sorted.length === 0 && q && (
                 <Box sx={{ py: 4, textAlign: 'center' }}>
-                  <Typography color="text.secondary">Ничего не найдено по запросу «{search}»</Typography>
+                  <Typography color="text.secondary">{t.hist_not_found} «{search}»</Typography>
                 </Box>
               )}
               {sorted.length > 0 && (
@@ -380,7 +392,7 @@ const ProfitPanel: React.FC<Props> = ({ entries, onUpdate }) => {
                             direction={sortKey === 'label' ? sortDir : 'asc'}
                             onClick={() => handleSort('label')}
                           >
-                            Название
+                          {t.common_name}
                           </TableSortLabel>
                         </TableCell>
                         <TableCell align="right" sortDirection={sortKey === 'quantity' ? sortDir : false}>
@@ -389,7 +401,7 @@ const ProfitPanel: React.FC<Props> = ({ entries, onUpdate }) => {
                             direction={sortKey === 'quantity' ? sortDir : 'asc'}
                             onClick={() => handleSort('quantity')}
                           >
-                            Кол-во
+                          {t.profit_item_qty}
                           </TableSortLabel>
                         </TableCell>
                         <TableCell align="right" sortDirection={sortKey === 'baseCostPerPiece' ? sortDir : false}>
@@ -398,7 +410,7 @@ const ProfitPanel: React.FC<Props> = ({ entries, onUpdate }) => {
                             direction={sortKey === 'baseCostPerPiece' ? sortDir : 'asc'}
                             onClick={() => handleSort('baseCostPerPiece')}
                           >
-                            Себест. / шт.
+                          {t.profit_col_cost}
                           </TableSortLabel>
                         </TableCell>
                         <TableCell align="right" sortDirection={sortKey === 'salePricePerPiece' ? sortDir : false}>
@@ -407,7 +419,7 @@ const ProfitPanel: React.FC<Props> = ({ entries, onUpdate }) => {
                             direction={sortKey === 'salePricePerPiece' ? sortDir : 'asc'}
                             onClick={() => handleSort('salePricePerPiece')}
                           >
-                            Цена / шт.
+                          {t.profit_col_price}
                           </TableSortLabel>
                         </TableCell>
                         <TableCell align="right" sortDirection={sortKey === 'revenue' ? sortDir : false}>
@@ -416,7 +428,7 @@ const ProfitPanel: React.FC<Props> = ({ entries, onUpdate }) => {
                             direction={sortKey === 'revenue' ? sortDir : 'asc'}
                             onClick={() => handleSort('revenue')}
                           >
-                            Выручка
+                          {t.profit_revenue}
                           </TableSortLabel>
                         </TableCell>
                         <TableCell align="right" sortDirection={sortKey === 'profit' ? sortDir : false}>
@@ -425,7 +437,7 @@ const ProfitPanel: React.FC<Props> = ({ entries, onUpdate }) => {
                             direction={sortKey === 'profit' ? sortDir : 'asc'}
                             onClick={() => handleSort('profit')}
                           >
-                            Прибыль
+                          {t.res_profit}
                           </TableSortLabel>
                         </TableCell>
                         <TableCell align="right" sx={{ width: 80 }} />
@@ -445,7 +457,7 @@ const ProfitPanel: React.FC<Props> = ({ entries, onUpdate }) => {
                                   <Chip label="ручная" size="small" variant="outlined" sx={{ height: 18, fontSize: '0.65rem' }} />
                                 )}
                                 {!entry.isManual && (
-                                  <Chip label="из истории" size="small" color="primary" variant="outlined" sx={{ height: 18, fontSize: '0.65rem' }} />
+                                  <Chip label={t.profit_from_history} size="small" color="primary" variant="outlined" sx={{ height: 18, fontSize: '0.65rem' }} />
                                 )}
                               </Stack>
                             </TableCell>
@@ -489,12 +501,12 @@ const ProfitPanel: React.FC<Props> = ({ entries, onUpdate }) => {
                             </TableCell>
                             <TableCell align="right">
                               <Stack direction="row" justifyContent="flex-end">
-                                <Tooltip title="Редактировать">
+                                <Tooltip title={t.common_edit}>
                                   <IconButton size="small" onClick={() => setEditEntry(entry)}>
                                     <EditIcon fontSize="small" />
                                   </IconButton>
                                 </Tooltip>
-                                <Tooltip title="Удалить">
+                                <Tooltip title={t.common_delete}>
                                   <IconButton size="small" color="error" onClick={() => setDeleteId(entry.id)}>
                                     <DeleteIcon fontSize="small" />
                                   </IconButton>
@@ -512,17 +524,17 @@ const ProfitPanel: React.FC<Props> = ({ entries, onUpdate }) => {
                   <Box sx={{ px: 2, py: 1.5 }}>
                     <Stack direction="row" justifyContent="flex-end" spacing={4} flexWrap="wrap" gap={1}>
                       <Typography variant="body2" color="text.secondary">
-                        Итого выручка: <b>{formatMoney(totalRevenue)}</b>
+                      {t.profit_total_revenue} <b>{formatMoney(totalRevenue)}</b>
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Себестоимость: <b>{formatMoney(totalBaseCost)}</b>
+                      {t.profit_total_cost} <b>{formatMoney(totalBaseCost)}</b>
                       </Typography>
                       <Typography
                         variant="body2"
                         fontWeight={700}
                         color={totalProfit >= 0 ? 'success.main' : 'error.main'}
                       >
-                        Чистая прибыль: {totalProfit >= 0 ? '+' : ''}{formatMoney(totalProfit)}
+                        {t.profit_total_net}: {totalProfit >= 0 ? '+' : ''}{formatMoney(totalProfit)}
                       </Typography>
                     </Stack>
                   </Box>
@@ -538,20 +550,20 @@ const ProfitPanel: React.FC<Props> = ({ entries, onUpdate }) => {
         open={addOpen}
         onSave={handleAdd}
         onClose={() => setAddOpen(false)}
-        title="Добавить запись"
+        title={t.profit_new_title}
       />
       <EntryDialog
         open={!!editEntry}
         initial={editEntry ?? undefined}
         onSave={handleEdit}
         onClose={() => setEditEntry(null)}
-        title="Редактировать запись"
+        title={t.profit_edit_title}
       />
       <ConfirmDialog
         open={!!deleteId}
-        title="Удалить запись?"
-        message="Запись будет удалена из таблицы прибыли."
-        confirmLabel="Удалить"
+        title={t.common_confirm_delete}
+        message={t.profit_delete_msg}
+        confirmLabel={t.common_delete}
         onConfirm={() => deleteId && handleDelete(deleteId)}
         onCancel={() => setDeleteId(null)}
         danger

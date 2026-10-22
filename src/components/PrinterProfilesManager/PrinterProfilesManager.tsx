@@ -23,6 +23,7 @@ import PrintIcon from '@mui/icons-material/Print';
 import type { PrinterProfile } from '../../types';
 import ConfirmDialog from '../common/ConfirmDialog';
 import { generateId } from '../../utils/storage';
+import { useTranslation } from '../../i18n/useTranslation';
 
 interface PrinterDialogProps {
   open: boolean;
@@ -40,6 +41,7 @@ const emptyProfile = (): Omit<PrinterProfile, 'id'> => ({
 });
 
 const PrinterDialog: React.FC<PrinterDialogProps> = ({ open, initial, onSave, onClose }) => {
+  const { t } = useTranslation();
   const [form, setForm] = useState<Omit<PrinterProfile, 'id'>>(
     initial ? { ...initial } : emptyProfile()
   );
@@ -59,10 +61,10 @@ const PrinterDialog: React.FC<PrinterDialogProps> = ({ open, initial, onSave, on
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
-    if (!form.name.trim()) errs.name = 'Введите название принтера';
-    if (form.powerWatts <= 0) errs.powerWatts = 'Мощность должна быть больше 0';
-    if (form.printerCost < 0) errs.printerCost = 'Стоимость не может быть отрицательной';
-    if (form.lifeHours <= 0) errs.lifeHours = 'Срок службы должен быть больше 0';
+    if (!form.name.trim()) errs.name = t.printers_name;
+    if (form.powerWatts <= 0) errs.powerWatts = t.common_power;
+    if (form.printerCost < 0) errs.printerCost = t.common_cost;
+    if (form.lifeHours <= 0) errs.lifeHours = t.common_lifespan;
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -85,11 +87,11 @@ const PrinterDialog: React.FC<PrinterDialogProps> = ({ open, initial, onSave, on
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{initial ? 'Редактировать принтер' : 'Новый принтер'}</DialogTitle>
+      <DialogTitle>{initial ? t.printers_edit : t.printers_new}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <TextField
-            label="Название принтера"
+            label={t.printers_name_label}
             value={form.name}
             onChange={(e) => set('name', e.target.value)}
             error={!!errors.name}
@@ -101,21 +103,21 @@ const PrinterDialog: React.FC<PrinterDialogProps> = ({ open, initial, onSave, on
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
-                label="Потребляемая мощность"
+                label={t.printers_power}
                 type="number"
                 value={form.powerWatts}
                 onChange={(e) => set('powerWatts', parseFloat(e.target.value) || 0)}
                 error={!!errors.powerWatts}
                 helperText={errors.powerWatts}
                 inputProps={{ min: 1, step: 1 }}
-                InputProps={{ endAdornment: <Box component="span" sx={{ ml: 0.5, color: 'text.secondary' }}>Вт</Box> }}
+                InputProps={{ endAdornment: <Box component="span" sx={{ ml: 0.5, color: 'text.secondary' }}>{t.common_watts}</Box> }}
                 fullWidth
                 size="small"
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
-                label="Стоимость принтера"
+                label={t.printers_cost}
                 type="number"
                 value={form.printerCost}
                 onChange={(e) => set('printerCost', parseFloat(e.target.value) || 0)}
@@ -129,33 +131,27 @@ const PrinterDialog: React.FC<PrinterDialogProps> = ({ open, initial, onSave, on
             </Grid>
           </Grid>
           <TextField
-            label="Срок службы"
+            label={t.printers_life}
             type="number"
             value={form.lifeHours}
             onChange={(e) => set('lifeHours', parseFloat(e.target.value) || 0)}
             error={!!errors.lifeHours}
-            helperText={errors.lifeHours || 'По умолчанию 3000 часов'}
+            helperText={errors.lifeHours || t.printers_life_hint}
             inputProps={{ min: 1, step: 100 }}
-            InputProps={{ endAdornment: <Box component="span" sx={{ ml: 0.5, color: 'text.secondary' }}>часов</Box> }}
+            InputProps={{ endAdornment: <Box component="span" sx={{ ml: 0.5, color: 'text.secondary' }}>{t.common_hours}</Box> }}
             fullWidth
             size="small"
           />
           {form.printerCost > 0 && (
-            <Box
-              sx={{
-                p: 1.5,
-                borderRadius: 1,
-                bgcolor: 'action.hover',
-              }}
-            >
+            <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: 'action.hover' }}>
               <Typography variant="body2" color="text.secondary">
-                Износ за 1 час печати:{' '}
+                {t.printers_wear_label}:{' '}
                 <strong>{wearPerHour} ₽</strong>
               </Typography>
             </Box>
           )}
           <TextField
-            label="Примечание (необязательно)"
+            label={t.printers_optional_note}
             value={form.note}
             onChange={(e) => set('note', e.target.value)}
             multiline
@@ -166,8 +162,8 @@ const PrinterDialog: React.FC<PrinterDialogProps> = ({ open, initial, onSave, on
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose} variant="outlined">Отмена</Button>
-        <Button onClick={handleSave} variant="contained">Сохранить</Button>
+        <Button onClick={onClose} variant="outlined">{t.common_cancel}</Button>
+        <Button onClick={handleSave} variant="contained">{t.common_save}</Button>
       </DialogActions>
     </Dialog>
   );
@@ -179,6 +175,7 @@ interface Props {
 }
 
 const PrinterProfilesManager: React.FC<Props> = ({ printers, onUpdate }) => {
+  const { t } = useTranslation();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<PrinterProfile | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PrinterProfile | null>(null);
@@ -208,27 +205,19 @@ const PrinterProfilesManager: React.FC<Props> = ({ printers, onUpdate }) => {
   return (
     <Box>
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
-        <Typography variant="h6">Принтеры</Typography>
+        <Typography variant="h6">{t.printers_title}</Typography>
         <Button variant="contained" startIcon={<AddIcon />} onClick={openNew}>
-          Добавить
+          {t.printers_add}
         </Button>
       </Stack>
 
       {printers.length === 0 ? (
-        <Box
-          sx={{
-            py: 6,
-            textAlign: 'center',
-            border: '2px dashed',
-            borderColor: 'divider',
-            borderRadius: 2,
-          }}
-        >
+        <Box sx={{ py: 6, textAlign: 'center', border: '2px dashed', borderColor: 'divider', borderRadius: 2 }}>
           <Typography color="text.secondary" gutterBottom>
-            Профили принтеров отсутствуют
+            {t.printers_empty}
           </Typography>
-          <Button variant="outlined" startIcon={<AddIcon />} onClick={openNew}>
-            Добавить первый принтер
+          <Button variant="outlined" startIcon={<AddIcon />} onClick={openNew} sx={{ maxWidth: '100%' }}>
+            {t.printers_add_first}
           </Button>
         </Box>
       ) : (
@@ -250,12 +239,12 @@ const PrinterProfilesManager: React.FC<Props> = ({ printers, onUpdate }) => {
                         </Typography>
                       </Stack>
                       <Stack direction="row" spacing={0.5}>
-                        <Tooltip title="Редактировать">
+                        <Tooltip title={t.common_edit}>
                           <IconButton size="small" onClick={() => { setEditTarget(printer); setDialogOpen(true); }}>
                             <EditIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Удалить">
+                        <Tooltip title={t.common_delete}>
                           <IconButton size="small" color="error" onClick={() => setDeleteTarget(printer)}>
                             <DeleteIcon fontSize="small" />
                           </IconButton>
@@ -267,19 +256,19 @@ const PrinterProfilesManager: React.FC<Props> = ({ printers, onUpdate }) => {
 
                     <Stack spacing={0.5}>
                       <Stack direction="row" justifyContent="space-between">
-                        <Typography variant="body2" color="text.secondary">Мощность</Typography>
-                        <Typography variant="body2">{printer.powerWatts} Вт</Typography>
+                        <Typography variant="body2" color="text.secondary">{t.common_power}</Typography>
+                        <Typography variant="body2">{printer.powerWatts} {t.common_watts}</Typography>
                       </Stack>
                       <Stack direction="row" justifyContent="space-between">
-                        <Typography variant="body2" color="text.secondary">Стоимость</Typography>
+                        <Typography variant="body2" color="text.secondary">{t.common_cost}</Typography>
                         <Typography variant="body2">{printer.printerCost.toLocaleString('ru-RU')} ₽</Typography>
                       </Stack>
                       <Stack direction="row" justifyContent="space-between">
-                        <Typography variant="body2" color="text.secondary">Срок службы</Typography>
-                        <Typography variant="body2">{printer.lifeHours.toLocaleString('ru-RU')} ч</Typography>
+                        <Typography variant="body2" color="text.secondary">{t.common_lifespan}</Typography>
+                        <Typography variant="body2">{printer.lifeHours.toLocaleString('ru-RU')} {t.common_hour_short}</Typography>
                       </Stack>
                       <Stack direction="row" justifyContent="space-between">
-                        <Typography variant="body2" color="text.secondary">Износ / час</Typography>
+                        <Typography variant="body2" color="text.secondary">{t.printers_wear}</Typography>
                         <Typography variant="body2" color="warning.main" fontWeight={600}>
                           {wearPerHour.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽
                         </Typography>
@@ -307,9 +296,9 @@ const PrinterProfilesManager: React.FC<Props> = ({ printers, onUpdate }) => {
 
       <ConfirmDialog
         open={!!deleteTarget}
-        title="Удалить принтер?"
-        message={`Профиль «${deleteTarget?.name}» будет удалён без возможности восстановления.`}
-        confirmLabel="Удалить"
+        title={t.printers_delete_title}
+        message={`«${deleteTarget?.name}» ${t.printers_delete_msg}`}
+        confirmLabel={t.common_delete}
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
         danger

@@ -1,4 +1,4 @@
-import type { SpoolProfile, PrinterProfile, SavedCalculation, AppSettings, Project, ProfitEntry, PrintCalculationInput } from '../types';
+import type { SpoolProfile, PrinterProfile, SavedCalculation, AppSettings, Project, ProfitEntry, PrintCalculationInput, WarehouseItem } from '../types';
 import { DEFAULT_SETTINGS } from './defaults';
 
 const KEYS = {
@@ -9,6 +9,7 @@ const KEYS = {
   PROJECTS: 'pfdm_projects',
   DRAFT: 'pfdm_draft',
   PROFIT: 'pfdm_profit',
+  WAREHOUSE: 'pfdm_warehouse',
 } as const;
 
 function safeGet<T>(key: string, fallback: T): T {
@@ -124,6 +125,16 @@ export function saveProfitEntries(entries: ProfitEntry[]): void {
   safeSet(KEYS.PROFIT, entries);
 }
 
+// ---- Warehouse ----
+
+export function loadWarehouse(): WarehouseItem[] {
+  return safeGet<WarehouseItem[]>(KEYS.WAREHOUSE, []);
+}
+
+export function saveWarehouse(items: WarehouseItem[]): void {
+  safeSet(KEYS.WAREHOUSE, items);
+}
+
 // ---- Export / Import ----
 
 export interface BackupData {
@@ -135,6 +146,7 @@ export interface BackupData {
   projects: Project[];
   settings: AppSettings;
   profitEntries?: ProfitEntry[];
+  warehouse?: WarehouseItem[];
 }
 
 export function exportAllData(
@@ -144,6 +156,7 @@ export function exportAllData(
   projects: Project[],
   settings: AppSettings,
   profitEntries?: ProfitEntry[],
+  warehouse?: WarehouseItem[],
 ): void {
   const backup: BackupData = {
     version: 1,
@@ -154,6 +167,7 @@ export function exportAllData(
     projects,
     settings,
     profitEntries: profitEntries ?? [],
+    warehouse: warehouse ?? [],
   };
   const json = JSON.stringify(backup, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
@@ -179,6 +193,7 @@ export function parseBackup(json: string): BackupData | null {
       projects: Array.isArray(data.projects) ? data.projects : [],
       settings: data.settings ?? {},
       profitEntries: Array.isArray(data.profitEntries) ? data.profitEntries : [],
+      warehouse: Array.isArray(data.warehouse) ? data.warehouse : [],
     } as BackupData;
   } catch {
     return null;

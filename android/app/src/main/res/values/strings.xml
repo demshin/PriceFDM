@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PriceFDM</string>
+    <string name="title_activity_main">PriceFDM</string>
+    <string name="package_name">com.pricefdm.app</string>
+    <string name="custom_url_scheme">com.pricefdm.app</string>
+</resources>

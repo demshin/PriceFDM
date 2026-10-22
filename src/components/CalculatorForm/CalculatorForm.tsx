@@ -8,6 +8,10 @@ import {
   Checkbox,
   Chip,
   Collapse,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   FormControl,
   FormControlLabel,
@@ -15,6 +19,10 @@ import {
   Grid,
   IconButton,
   InputLabel,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemText,
   MenuItem,
   Paper,
   Radio,
@@ -29,9 +37,11 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import type { PrintCalculationInput, SpoolProfile, PrinterProfile, ProcessingItem, PlasticType } from '../../types';
+import WarehouseIcon from '@mui/icons-material/Warehouse';
+import type { PrintCalculationInput, SpoolProfile, PrinterProfile, ProcessingItem, PlasticType, WarehouseItem } from '../../types';
 import { COMPLEXITY_OPTIONS } from '../../utils/defaults';
 import { parseGcode } from '../../utils/gcode';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /** Нормализует тип пластика из G-code в PlasticType */
 function normalizePlasticType(ft: string): PlasticType {
@@ -54,15 +64,18 @@ interface Props {
   onChange: (input: PrintCalculationInput) => void;
   spools: SpoolProfile[];
   printers: PrinterProfile[];
+  warehouse?: WarehouseItem[];
   errors: Record<string, string>;
   onClear?: () => void;
 }
 
-const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, errors, onClear }) => {
+const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, warehouse, errors, onClear }) => {
+  const { t } = useTranslation();
   const gcodeInputRef = useRef<HTMLInputElement>(null);
   const [gcodeMessage, setGcodeMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [gcodeModelWeightMissing, setGcodeModelWeightMissing] = useState(false);
   const [gcodeIsMulticolor, setGcodeIsMulticolor] = useState(false);
+  const [warehouseDialogOpen, setWarehouseDialogOpen] = useState(false);
 
   const set = <K extends keyof PrintCalculationInput>(key: K, value: PrintCalculationInput[K]) => {
     onChange({ ...input, [key]: value });
@@ -236,10 +249,10 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
             size="small"
             onClick={() => gcodeInputRef.current?.click()}
           >
-            Импорт G-code
+            {t.calc_import_gcode}
           </Button>
           <Typography variant="caption" color="text.secondary">
-            PrusaSlicer, OrcaSlicer, Cura — автозаполнение веса и времени
+            {t.calc_gcode_hint}
           </Typography>
         </Stack>
         <input
@@ -266,11 +279,11 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
       <Card variant="outlined">
         <CardContent>
           <Typography variant="subtitle1" fontWeight={600} gutterBottom color="primary">
-            Основные параметры
+            {t.calc_main_params}
           </Typography>
           <Stack spacing={2}>
             <TextField
-              label="Название детали"
+              label={t.calc_part_name}
               value={input.partName}
               onChange={(e) => set('partName', e.target.value)}
               error={!!errors.partName}
@@ -283,12 +296,12 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
-                  label="Общий расход филамента"
+                  label={t.calc_part_weight}
                   type="number"
                   value={input.partWeight || ''}
                   onChange={(e) => handleWeightChange('partWeight', parseFloat(e.target.value) || 0)}
                   error={!!errors.partWeight}
-                  helperText={errors.partWeight || 'Включая поддержки и юбку'}
+                  helperText={errors.partWeight || t.calc_with_supports}
                   inputProps={{ min: 0, step: 0.1 }}
                   InputProps={{ endAdornment: <Box component="span" sx={{ ml: 0.5, color: 'text.secondary', fontSize: '0.85em' }}>г</Box> }}
                   fullWidth
@@ -298,14 +311,14 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
-                  label="Вес модели"
+                  label={t.calc_model_weight}
                   type="number"
                   value={input.modelWeight || ''}
                   onChange={(e) => handleWeightChange('modelWeight', parseFloat(e.target.value) || 0)}
                   helperText={
                     gcodeModelWeightMissing && !input.modelWeight
-                      ? 'Не найден в G-code — введите вручную если есть поддержки'
-                      : 'Только модель, без поддержек'
+                      ? t.calc_model_weight_missing
+                      : t.calc_without_supports
                   }
                   inputProps={{ min: 0, step: 0.1 }}
                   InputProps={{
@@ -313,7 +326,7 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         {gcodeModelWeightMissing && !input.modelWeight && (
                           <Tooltip
-                            title="Слайсер не записал вес модели отдельно. Если в модели есть поддержки или юбка — введите вес модели вручную. Если оставить пустым, расчёт будет по общему весу филамента."
+                            title={t.calc_model_weight_tooltip}
                             arrow
                             placement="top"
                           >
@@ -324,7 +337,7 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
                             />
                           </Tooltip>
                         )}
-                        <Box component="span" sx={{ color: 'text.secondary', fontSize: '0.85em' }}>г</Box>
+                        <Box component="span" sx={{ color: 'text.secondary', fontSize: '0.85em' }}>{t.common_grams}</Box>
                       </Box>
                     ),
                   }}
@@ -338,7 +351,7 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
-                  label="Количество деталей"
+                  label={t.calc_quantity_parts}
                   type="number"
                   value={input.quantity}
                   onChange={(e) => set('quantity', Math.max(1, parseInt(e.target.value) || 1))}
@@ -361,20 +374,20 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
                   }
                   label={
                     <Stack>
-                      <Typography variant="body2" fontWeight={600}>Оптовый заказ</Typography>
-                      <Typography variant="caption" color="text.secondary">Скидка на цену каждой детали</Typography>
+                      <Typography variant="body2" fontWeight={600}>{t.calc_wholesale}</Typography>
+                      <Typography variant="caption" color="text.secondary">{t.calc_wholesale_desc}</Typography>
                     </Stack>
                   }
                 />
                 {(input.wholesaleEnabled ?? false) && (
                   <TextField
-                    label="Скидка за шт."
+                    label={t.calc_wholesale_discount}
                     type="number"
                     value={input.wholesaleDiscount ?? 10}
                     onChange={(e) => set('wholesaleDiscount', Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
                     inputProps={{ min: 0, max: 100, step: 1 }}
                     InputProps={{ endAdornment: <Box component="span" sx={{ ml: 0.5, color: 'text.secondary', fontSize: '0.85em' }}>%</Box> }}
-                    helperText="По умолчанию 10%"
+                    helperText={t.calc_wholesale_default}
                     sx={{ width: 200, mt: 1 }}
                     size="small"
                   />
@@ -390,7 +403,7 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
               <Grid container spacing={2}>
                 <Grid size={{ xs: 6 }}>
                   <TextField
-                    label="Часы"
+                    label={t.calc_hours}
                     type="number"
                     value={input.printHours}
                     onChange={(e) => set('printHours', Math.max(0, parseInt(e.target.value) || 0))}
@@ -402,7 +415,7 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
                 </Grid>
                 <Grid size={{ xs: 6 }}>
                   <TextField
-                    label="Минуты"
+                    label={t.calc_minutes}
                     type="number"
                     value={input.printMinutes}
                     onChange={(e) => set('printMinutes', Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))}
@@ -423,10 +436,10 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
         <CardContent>
           <FormControl component="fieldset" fullWidth>
             <FormLabel component="legend" sx={{ mb: 0.5, fontWeight: 600, color: 'primary.main', fontSize: '0.95rem' }}>
-              Сложность модели
+              {t.calc_complexity}
             </FormLabel>
             <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
-              Коэффициент сложности учитывает сложность геометрии, количество поддержек и риск брака.
+              {t.calc_complexity_desc}
             </Typography>
             <RadioGroup
               value={String(input.complexityCoefficient)}
@@ -480,19 +493,19 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
       <Card variant="outlined">
         <CardContent>
           <Typography variant="subtitle1" fontWeight={600} gutterBottom color="primary">
-            Материал
+            {t.calc_material}
           </Typography>
           <Stack spacing={2}>
             {spools.length > 0 && (
               <FormControl fullWidth size="small">
-                <InputLabel>Профиль катушки</InputLabel>
+                <InputLabel>{t.calc_spool_profile}</InputLabel>
                 <Select
                   value={input.spoolProfileId || ''}
-                  label="Профиль катушки"
+                  label={t.calc_spool_profile}
                   onChange={(e) => handleSpoolSelect(e.target.value)}
                   renderValue={(v) => {
                     const s = spools.find((x) => x.id === v);
-                    if (!s) return 'Не выбран';
+                    if (!s) return t.calc_not_selected;
                     return (
                       <Stack direction="row" alignItems="center" spacing={1}>
                         <ColorDot color={s.color} />
@@ -525,10 +538,10 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
                     <ColorDot color={selectedSpool.color} />
                     <Typography variant="caption">{selectedSpool.color}</Typography>
                   </Stack>
-                  <Typography variant="caption" color="text.secondary">Тип: <strong>{selectedSpool.plasticType}</strong></Typography>
-                  <Typography variant="caption" color="text.secondary">Цена 1 г: <strong>{gramCost.toFixed(2)} ₽</strong></Typography>
+                  <Typography variant="caption" color="text.secondary">{t.calc_type_label} <strong>{selectedSpool.plasticType}</strong></Typography>
+                  <Typography variant="caption" color="text.secondary">{t.calc_gram_price_label} <strong>{gramCost.toFixed(2)} ₽</strong></Typography>
                   {gcodeIsMulticolor && (
-                    <Chip label="🌈 Цветная" size="small" color="secondary" variant="outlined" sx={{ height: 20, fontSize: '0.7rem' }} />
+                    <Chip label={`🌈 ${t.calc_colorful}`} size="small" color="secondary" variant="outlined" sx={{ height: 20, fontSize: '0.7rem' }} />
                   )}
                 </Stack>
               </Paper>
@@ -537,26 +550,26 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
-                  label="Цена катушки"
-                  type="number"
-                  value={input.spoolPrice || ''}
-                  onChange={(e) => set('spoolPrice', parseFloat(e.target.value) || 0)}
-                  inputProps={{ min: 0, step: 10 }}
-                  InputProps={{ endAdornment: <Box component="span" sx={{ ml: 0.5, color: 'text.secondary', fontSize: '0.85em' }}>₽</Box> }}
-                  helperText={selectedSpool ? 'Из профиля — можно изменить вручную' : undefined}
+                    label={t.calc_spool_price}
+                    type="number"
+                    value={input.spoolPrice || ''}
+                    onChange={(e) => set('spoolPrice', parseFloat(e.target.value) || 0)}
+                    inputProps={{ min: 0, step: 10 }}
+                    InputProps={{ endAdornment: <Box component="span" sx={{ ml: 0.5, color: 'text.secondary', fontSize: '0.85em' }}>₽</Box> }}
+                    helperText={selectedSpool ? t.calc_from_profile : undefined}
                   fullWidth
                   size="small"
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
-                  label="Вес катушки"
-                  type="number"
-                  value={input.spoolWeight}
-                  onChange={(e) => set('spoolWeight', parseFloat(e.target.value) || 1000)}
-                  inputProps={{ min: 1, step: 50 }}
-                  InputProps={{ endAdornment: <Box component="span" sx={{ ml: 0.5, color: 'text.secondary', fontSize: '0.85em' }}>г</Box> }}
-                  helperText={selectedSpool ? 'Из профиля — можно изменить вручную' : 'По умолчанию 1000 г'}
+                    label={t.calc_spool_weight}
+                    type="number"
+                    value={input.spoolWeight}
+                    onChange={(e) => set('spoolWeight', parseFloat(e.target.value) || 1000)}
+                    inputProps={{ min: 1, step: 50 }}
+                    InputProps={{ endAdornment: <Box component="span" sx={{ ml: 0.5, color: 'text.secondary', fontSize: '0.85em' }}>{t.common_grams}</Box> }}
+                    helperText={selectedSpool ? t.calc_from_profile : t.calc_default_1000g}
                   fullWidth
                   size="small"
                 />
@@ -570,18 +583,18 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
       <Card variant="outlined">
         <CardContent>
           <Typography variant="subtitle1" fontWeight={600} gutterBottom color="primary">
-            Принтер и электроэнергия
+            {t.calc_printer_elec}
           </Typography>
           <Stack spacing={2}>
             {printers.length > 0 && (
               <FormControl fullWidth size="small">
-                <InputLabel>Профиль принтера</InputLabel>
+                <InputLabel>{t.calc_printer_profile}</InputLabel>
                 <Select
                   value={input.printerProfileId || ''}
-                  label="Профиль принтера"
+                  label={t.calc_printer_profile}
                   onChange={(e) => handlePrinterSelect(e.target.value)}
                 >
-                  <MenuItem value=""><em>Не выбран</em></MenuItem>
+                  <MenuItem value=""><em>{t.calc_not_selected}</em></MenuItem>
                   {printers.map((p) => (
                     <MenuItem key={p.id} value={p.id}>{p.name} · {p.powerWatts} Вт</MenuItem>
                   ))}
@@ -592,26 +605,26 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
-                  label="Мощность принтера"
+                  label={t.calc_power}
                   type="number"
                   value={input.powerWatts}
                   onChange={(e) => set('powerWatts', parseFloat(e.target.value) || 220)}
                   inputProps={{ min: 1, step: 10 }}
-                  InputProps={{ endAdornment: <Box component="span" sx={{ ml: 0.5, color: 'text.secondary', fontSize: '0.85em' }}>Вт</Box> }}
-                  helperText={selectedPrinter ? 'Из профиля — можно изменить' : 'По умолчанию 220 Вт'}
+                  InputProps={{ endAdornment: <Box component="span" sx={{ ml: 0.5, color: 'text.secondary', fontSize: '0.85em' }}>{t.common_watts}</Box> }}
+                  helperText={selectedPrinter ? t.calc_from_profile : `${t.common_default_label} 220 ${t.common_watts}`}
                   fullWidth
                   size="small"
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
-                  label="Стоимость эл-энергии"
+                  label={t.calc_electricity_cost}
                   type="number"
                   value={input.electricityCostPerKwh}
                   onChange={(e) => set('electricityCostPerKwh', parseFloat(e.target.value) || 6)}
                   inputProps={{ min: 0, step: 0.1 }}
                   InputProps={{ endAdornment: <Box component="span" sx={{ ml: 0.5, color: 'text.secondary', fontSize: '0.85em' }}>₽/кВт⋅ч</Box> }}
-                  helperText="По умолчанию 6 ₽/кВт⋅ч"
+                  helperText={t.settings_elec_tooltip}
                   fullWidth
                   size="small"
                 />
@@ -621,26 +634,26 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
-                  label="Стоимость принтера"
+                  label={t.calc_printer_cost}
                   type="number"
                   value={input.printerCost}
                   onChange={(e) => set('printerCost', parseFloat(e.target.value) || 0)}
                   inputProps={{ min: 0, step: 1000 }}
                   InputProps={{ endAdornment: <Box component="span" sx={{ ml: 0.5, color: 'text.secondary', fontSize: '0.85em' }}>₽</Box> }}
-                  helperText={selectedPrinter ? 'Из профиля — можно изменить' : undefined}
+                  helperText={selectedPrinter ? t.calc_from_profile : undefined}
                   fullWidth
                   size="small"
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
-                  label="Срок службы"
+                  label={t.calc_printer_life}
                   type="number"
                   value={input.printerLifeHours}
                   onChange={(e) => set('printerLifeHours', parseFloat(e.target.value) || 3000)}
                   inputProps={{ min: 1, step: 100 }}
-                  InputProps={{ endAdornment: <Box component="span" sx={{ ml: 0.5, color: 'text.secondary', fontSize: '0.85em' }}>ч</Box> }}
-                  helperText={selectedPrinter ? 'Из профиля — можно изменить' : 'По умолчанию 3000 ч'}
+                  InputProps={{ endAdornment: <Box component="span" sx={{ ml: 0.5, color: 'text.secondary', fontSize: '0.85em' }}>{t.common_hour_short}</Box> }}
+                  helperText={selectedPrinter ? t.calc_from_profile : `${t.common_default_label} 3000 ${t.common_hour_short}`}
                   fullWidth
                   size="small"
                 />
@@ -660,7 +673,7 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
                 onChange={(e) => onChange({ ...input, processing: { ...input.processing, enabled: e.target.checked } })}
               />
             }
-            label={<Typography variant="subtitle1" fontWeight={600} color="primary">Обработка</Typography>}
+            label={<Typography variant="subtitle1" fontWeight={600} color="primary">{t.calc_processing}</Typography>}
           />
 
           {input.processing.enabled && (
@@ -712,13 +725,13 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
                       <Grid size={{ xs: 12, sm: item.isCustom ? 7 : 7 }}>
                         {item.enabled && (
                           <TextField
-                            label="Стоимость"
+                            label={t.common_cost}
                             type="number"
                             value={item.cost || ''}
                             onChange={(e) => updateProcessingItem(item.id, { cost: parseFloat(e.target.value) || 0 })}
                             inputProps={{ min: 0, step: item.costMode === 'per_gram' ? 0.1 : 10 }}
                             InputProps={{ endAdornment: <Box component="span" sx={{ ml: 0.5, color: 'text.secondary', fontSize: '0.85em' }}>₽</Box> }}
-                            helperText={item.costMode === 'per_gram' && autoComputedCost !== null ? 'Авто · можно изменить' : undefined}
+                            helperText={item.costMode === 'per_gram' && autoComputedCost !== null ? t.calc_auto_computed : undefined}
                             size="small"
                             fullWidth
                           />
@@ -726,7 +739,7 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
                       </Grid>
                       {item.isCustom && (
                         <Grid size={{ xs: 'auto' }}>
-                          <Tooltip title="Удалить этап">
+                          <Tooltip title={t.common_delete}>
                             <IconButton size="small" color="error" onClick={() => removeCustomItem(item.id)} sx={{ mt: 0.5 }}>
                               <DeleteOutlineIcon fontSize="small" />
                             </IconButton>
@@ -745,7 +758,7 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
                 onClick={addCustomProcessingItem}
                 sx={{ alignSelf: 'flex-start' }}
               >
-                Добавить свой этап
+                {t.calc_add_custom}
               </Button>
             </Stack>
           )}
@@ -756,19 +769,31 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
       <Card variant="outlined">
         <CardContent>
           <Typography variant="subtitle1" fontWeight={600} gutterBottom color="primary">
-            Дополнительные расходы
+            {t.calc_extra_costs}
           </Typography>
-          <TextField
-            label="Прочие расходы"
-            type="number"
-            value={input.extraCost || ''}
-            onChange={(e) => set('extraCost', parseFloat(e.target.value) || 0)}
-            inputProps={{ min: 0, step: 10 }}
-            InputProps={{ endAdornment: <Box component="span" sx={{ ml: 0.5, color: 'text.secondary', fontSize: '0.85em' }}>₽</Box> }}
-            helperText="Доставка, расходники, аренда — всё что не входит в другие категории"
-            fullWidth
-            size="small"
-          />
+          <Stack spacing={2}>
+            <TextField
+              label="Прочие расходы"
+              type="number"
+              value={input.extraCost || ''}
+              onChange={(e) => set('extraCost', parseFloat(e.target.value) || 0)}
+              inputProps={{ min: 0, step: 10 }}
+              InputProps={{ endAdornment: <Box component="span" sx={{ ml: 0.5, color: 'text.secondary', fontSize: '0.85em' }}>₽</Box> }}
+              helperText={t.calc_extra_costs_hint}
+              fullWidth
+              size="small"
+            />
+            {warehouse && warehouse.length > 0 && (
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<WarehouseIcon />}
+                onClick={() => setWarehouseDialogOpen(true)}
+              >
+                {t.calc_add_from_warehouse}
+              </Button>
+            )}
+          </Stack>
         </CardContent>
       </Card>
 
@@ -776,33 +801,33 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
       <Card variant="outlined">
         <CardContent>
           <Stack direction="row" alignItems="center" spacing={1} mb={1.5}>
-            <Typography variant="subtitle1" fontWeight={600} color="primary">Прибыль</Typography>
+            <Typography variant="subtitle1" fontWeight={600} color="primary">{t.calc_profit}</Typography>
             <Tooltip title="Прибыль добавляется к себестоимости для получения итоговой цены">
               <IconButton size="small"><InfoOutlinedIcon fontSize="small" /></IconButton>
             </Tooltip>
           </Stack>
 
           <RadioGroup row value={input.profitMode} onChange={(e) => set('profitMode', e.target.value as 'percent' | 'fixed')}>
-            <FormControlLabel value="percent" control={<Radio size="small" />} label="Процент" />
-            <FormControlLabel value="fixed" control={<Radio size="small" />} label="Фиксированная сумма" />
+            <FormControlLabel value="percent" control={<Radio size="small" />} label={t.calc_profit_percent} />
+            <FormControlLabel value="fixed" control={<Radio size="small" />} label={t.calc_profit_fixed} />
           </RadioGroup>
 
           <Box sx={{ mt: 1.5 }}>
             {input.profitMode === 'percent' ? (
               <TextField
-                label="Процент прибыли"
+                label={t.calc_profit_percent}
                 type="number"
                 value={input.profitValue}
                 onChange={(e) => set('profitValue', parseFloat(e.target.value) || 0)}
                 inputProps={{ min: 0, step: 1 }}
                 InputProps={{ endAdornment: <Box component="span" sx={{ ml: 0.5, color: 'text.secondary', fontSize: '0.85em' }}>%</Box> }}
-                helperText="По умолчанию 30%"
+                helperText={`${t.common_default_label} 30%`}
                 sx={{ width: 200 }}
                 size="small"
               />
             ) : (
               <TextField
-                label="Фиксированная прибыль"
+                label={t.calc_profit_fixed}
                 type="number"
                 value={input.profitValue}
                 onChange={(e) => set('profitValue', parseFloat(e.target.value) || 0)}
@@ -823,15 +848,42 @@ const CalculatorForm: React.FC<Props> = ({ input, onChange, spools, printers, er
             control={<Checkbox checked={input.roundingEnabled} onChange={(e) => set('roundingEnabled', e.target.checked)} />}
             label={
               <Stack>
-                <Typography variant="subtitle1" fontWeight={600} color="primary">Округление цены</Typography>
+                <Typography variant="subtitle1" fontWeight={600} color="primary">{t.calc_rounding}</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  До ₽1 (до ₽5, до ₽10 или до ₽50 — автоматически в зависимости от суммы)
+                  {t.calc_rounding_desc}
                 </Typography>
               </Stack>
             }
           />
         </CardContent>
       </Card>
+
+      {/* === Диалог выбора со склада === */}
+      {warehouse && warehouse.length > 0 && (
+        <Dialog open={warehouseDialogOpen} onClose={() => setWarehouseDialogOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>{t.calc_add_from_warehouse}</DialogTitle>
+          <DialogContent>
+            <List dense>
+              {warehouse.map((item) => (
+                <ListItem key={item.id} disablePadding>
+                  <ListItemButton onClick={() => {
+                    set('extraCost', (input.extraCost || 0) + item.price);
+                    setWarehouseDialogOpen(false);
+                  }}>
+                    <ListItemText
+                      primary={`${item.name} — ${item.price.toLocaleString('ru-RU')} ₽`}
+                      secondary={`${item.category} · ${item.quantity} ${item.unit}`}
+                    />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setWarehouseDialogOpen(false)}>{t.common_cancel}</Button>
+          </DialogActions>
+        </Dialog>
+      )}
     </Stack>
   );
 };

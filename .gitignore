@@ -19,6 +19,16 @@ electron-builder-cache
 
 release/
 
+# Capacitor native platforms (generated — commit once, then ignore build artifacts)
+# android/      ← раскомментировать, если НЕ хотите коммитить Android проект
+# ios/           ← раскомментировать, если НЕ хотите коммить iOS проект
+
+# Capacitor build artifacts
+android/app/build
+android/.gradle
+ios/App/Pods
+*.xcuserstate
+
 .vscode/*
 !.vscode/extensions.json
 .idea

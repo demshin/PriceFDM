@@ -29,7 +29,10 @@ import SpoolIcon from '@mui/icons-material/ViewInAr';
 import CalculateIcon from '@mui/icons-material/Calculate';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { getTheme } from './theme';
-import type { AppSettings, PrintCalculationInput, Project, SavedCalculation, SpoolProfile, PrinterProfile, ProfitEntry } from './types';
+import { I18nProvider } from './i18n/I18nProvider';
+import { useTranslation } from './i18n/useTranslation';
+import { translations } from './i18n/translations';
+import type { AppSettings, PrintCalculationInput, Project, SavedCalculation, SpoolProfile, PrinterProfile, ProfitEntry, WarehouseItem } from './types';
 import Layout, { type AppTab } from './components/Layout/Layout';
 import CalculatorForm from './components/CalculatorForm/CalculatorForm';
 import ResultsPanel from './components/ResultsPanel/ResultsPanel';
@@ -39,6 +42,7 @@ import PrinterProfilesManager from './components/PrinterProfilesManager/PrinterP
 import HistoryPanel from './components/HistoryPanel/HistoryPanel';
 import SettingsPanel from './components/SettingsPanel/SettingsPanel';
 import ProfitPanel from './components/ProfitPanel/ProfitPanel';
+import WarehousePanel from './components/WarehousePanel/WarehousePanel';
 import { calculate, formatMoney } from './utils/calculations';
 import {
   generateId,
@@ -57,6 +61,8 @@ import {
   saveSpools,
   loadProfitEntries,
   saveProfitEntries,
+  loadWarehouse,
+  saveWarehouse,
 } from './utils/storage';
 import { makeDefaultInput } from './utils/defaults';
 
@@ -76,6 +82,7 @@ const SaveToProjectDialog: React.FC<SaveDialogProps> = ({
   onClose,
   onCreateProject,
 }) => {
+  const { t } = useTranslation();
   const [selected, setSelected] = React.useState<string[]>([]);
   const [newName, setNewName] = React.useState('');
   const [note, setNote] = React.useState('');
@@ -99,10 +106,10 @@ const SaveToProjectDialog: React.FC<SaveDialogProps> = ({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>Сохранить расчёт</DialogTitle>
+      <DialogTitle>{t.app_save_calc}</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          Выберите один или несколько проектов
+          {t.app_select_projects}
         </Typography>
         {projects.length > 0 ? (
           <Stack spacing={0}>
@@ -122,38 +129,38 @@ const SaveToProjectDialog: React.FC<SaveDialogProps> = ({
           </Stack>
         ) : (
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Проектов пока нет
+            {t.hist_no_project}
           </Typography>
         )}
-        <Divider sx={{ my: 1.5 }}>новый проект</Divider>
+        <Divider sx={{ my: 1.5 }}>{t.hist_new_project}</Divider>
         <Stack direction="row" spacing={1}>
           <TextField
             size="small"
-            label="Название"
+            label={t.hist_project_name}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleAddProject(); }}
             fullWidth
           />
           <Button variant="outlined" disabled={!newName.trim()} onClick={handleAddProject}>
-            Создать
+            {t.common_create}
           </Button>
         </Stack>
-        <Divider sx={{ my: 1.5 }}>комментарий</Divider>
+        <Divider sx={{ my: 1.5 }}>{t.hist_comment}</Divider>
         <TextField
           size="small"
           fullWidth
           multiline
           maxRows={3}
-          placeholder="Необязательная заметка к расчёту..."
+          placeholder={t.common_optional}
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Отмена</Button>
+        <Button onClick={onClose}>{t.common_cancel}</Button>
         <Button variant="contained" onClick={handleSave}>
-          {selected.length === 0 ? 'Без проекта' : `Сохранить (${selected.length})`}
+          {selected.length === 0 ? t.app_save_no_project : `${t.common_save} (${selected.length})`}
         </Button>
       </DialogActions>
     </Dialog>
@@ -168,6 +175,7 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<SavedCalculation[]>(() => loadHistory());
   const [projects, setProjects] = useState<Project[]>(() => loadProjects());
   const [profitEntries, setProfitEntries] = useState<ProfitEntry[]>(() => loadProfitEntries());
+  const [warehouse, setWarehouse] = useState<WarehouseItem[]>(() => loadWarehouse());
   const [activeTab, setActiveTab] = useState<AppTab>('calculator');
   const [input, setInput] = useState<PrintCalculationInput>(() => {
     const draft = loadDraft();
@@ -200,6 +208,7 @@ const App: React.FC = () => {
   useEffect(() => { saveHistory(history); }, [history]);
   useEffect(() => { saveProjects(projects); }, [projects]);
   useEffect(() => { saveProfitEntries(profitEntries); }, [profitEntries]);
+  useEffect(() => { saveWarehouse(warehouse); }, [warehouse]);
   useEffect(() => { saveDraft(input); }, [input]);
 
   const result = useMemo(() => calculate(input), [input]);
@@ -293,6 +302,7 @@ const App: React.FC = () => {
     setHistory(data.history);
     setProjects(data.projects ?? []);
     if (data.profitEntries) setProfitEntries(data.profitEntries);
+    if (data.warehouse) setWarehouse(data.warehouse);
     if (data.settings) setSettings((prev) => ({ ...prev, ...data.settings }));
     setSnackbar({ open: true, message: 'Данные успешно восстановлены из резервной копии', severity: 'success' });
   }, []);
@@ -345,8 +355,10 @@ const App: React.FC = () => {
   const hasResult = input.partWeight > 0 || input.printHours > 0 || input.printMinutes > 0;
 
   const theme = useMemo(() => getTheme(settings.colorMode), [settings.colorMode]);
+  const t = translations[settings.language ?? 'ru'];
 
   return (
+    <I18nProvider lang={settings.language ?? 'ru'}>
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <>
@@ -365,13 +377,13 @@ const App: React.FC = () => {
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                 <Chip
                   size="small"
-                  label={`Расчётов: ${history.length}`}
+                  label={`${t.hist_title}: ${history.length}`}
                   variant="outlined"
                   color="primary"
                 />
                 <Chip
                   size="small"
-                  label={`Сумма заказов: ${formatMoney(
+                  label={`${t.app_order_sum}: ${formatMoney(
                     history.reduce((acc, h) => acc + (
                       h.result.roundingEnabled && h.result.totalPriceRounded !== null
                         ? h.result.totalPriceRounded
@@ -383,7 +395,7 @@ const App: React.FC = () => {
                 />
                 <Chip
                   size="small"
-                  label={`Суммарная прибыль: ${formatMoney(history.reduce((acc, h) => acc + h.result.totalProfit, 0))}`}
+                  label={`${t.app_total_profit}: ${formatMoney(history.reduce((acc, h) => acc + h.result.totalProfit, 0))}`}
                   variant="outlined"
                   color="warning"
                 />
@@ -396,6 +408,7 @@ const App: React.FC = () => {
                 onChange={(v) => { setInput(v); setFormErrors({}); }}
                 spools={spools}
                 printers={printers}
+                warehouse={warehouse}
                 errors={formErrors}
                 onClear={() => setConfirmClearForm(true)}
               />
@@ -453,6 +466,12 @@ const App: React.FC = () => {
           </Stack>
         )}
 
+        {activeTab === 'warehouse' && (
+          <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
+            <WarehousePanel items={warehouse} onUpdate={setWarehouse} />
+          </Paper>
+        )}
+
         {activeTab === 'spools' && (
           <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
             <SpoolProfilesManager spools={spools} onUpdate={setSpools} />
@@ -500,6 +519,7 @@ const App: React.FC = () => {
                 history={history}
                 projects={projects}
                 profitEntries={profitEntries}
+                warehouse={warehouse}
                 onUpdate={setSettings}
                 onImport={handleImportBackup}
               />
@@ -551,10 +571,10 @@ const App: React.FC = () => {
         <DialogTitle sx={{ pb: 1 }}>
           <Stack direction="row" alignItems="center" spacing={1}>
             <CalculateIcon color="primary" />
-            <Typography variant="h6" fontWeight={700}>Добро пожаловать в PriceFDM!</Typography>
+            <Typography variant="h6" fontWeight={700}>{t.app_welcome_title}</Typography>
           </Stack>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            Три шага — и вы готовы считать стоимость печати
+            {t.app_welcome_desc}
           </Typography>
         </DialogTitle>
         <DialogContent>
@@ -567,7 +587,7 @@ const App: React.FC = () => {
                     : <PrinterIcon color={onboardingStep === 0 ? 'primary' : 'disabled'} fontSize="small" />
                 }
               >
-                <Typography fontWeight={600}>Добавьте принтер</Typography>
+            <Typography fontWeight={600}>{t.app_onboard_step1}</Typography>
               </StepLabel>
               <StepContent>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
@@ -640,11 +660,11 @@ const App: React.FC = () => {
             color="inherit"
             onClick={() => { localStorage.setItem('pfdm_onboarding_done', '1'); setOnboardingOpen(false); }}
           >
-            Пропустить
+            {t.app_skip}
           </Button>
           {onboardingStep < 3 && (
             <Button variant="outlined" onClick={() => setOnboardingStep((s) => Math.min(s + 1, 2))}>
-              Далее
+              {t.common_next}
             </Button>
           )}
           {onboardingStep >= 2 && (
@@ -652,19 +672,19 @@ const App: React.FC = () => {
               variant="contained"
               onClick={() => { localStorage.setItem('pfdm_onboarding_done', '1'); setOnboardingOpen(false); }}
             >
-              Начать работу
+              {t.app_start}
             </Button>
           )}
         </DialogActions>
       </Dialog>
 
       <Dialog open={confirmClearForm} onClose={() => setConfirmClearForm(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Очистить форму?</DialogTitle>
+        <DialogTitle>{t.app_clear_form_title}</DialogTitle>
         <DialogContent>
-          <Typography sx={{ pt: 1 }}>Все введённые значения будут сброшены к значениям по умолчанию.</Typography>
+          <Typography sx={{ pt: 1 }}>{t.app_clear_form_desc}</Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmClearForm(false)}>Отмена</Button>
+          <Button onClick={() => setConfirmClearForm(false)}>{t.common_cancel}</Button>
           <Button
             color="error"
             variant="contained"
@@ -675,12 +695,13 @@ const App: React.FC = () => {
               setConfirmClearForm(false);
             }}
           >
-            Очистить
+            {t.calc_clear}
           </Button>
         </DialogActions>
       </Dialog>
     </>
   </ThemeProvider>
+  </I18nProvider>
   );
 };
 

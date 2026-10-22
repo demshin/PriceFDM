@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultPrinterLifeHours: 3000,
   defaultProfitPercent: 30,
   colorMode: 'light',
+  language: 'ru',
 };
 
 export const DEFAULT_PROCESSING_ITEMS: ProcessingItem[] = [

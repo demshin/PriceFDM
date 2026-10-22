@@ -8,6 +8,7 @@ import {
 } from '@mui/material';
 import type { PrintCalculationResult, PrintCalculationInput } from '../../types';
 import { formatMoney } from '../../utils/calculations';
+import { useTranslation } from '../../i18n/useTranslation';
 
 interface BreakdownRowProps {
   label: string;
@@ -53,13 +54,14 @@ interface Props {
 }
 
 const BreakdownPanel: React.FC<Props> = ({ result, input }) => {
+  const { t } = useTranslation();
   const timeStr = (() => {
     const h = Math.floor(result.printTimeHours);
     const m = Math.round((result.printTimeHours - h) * 60);
     const parts = [];
-    if (h > 0) parts.push(`${h} ч`);
-    if (m > 0) parts.push(`${m} мин`);
-    return parts.length > 0 ? parts.join(' ') : '< 1 мин';
+    if (h > 0) parts.push(`${h} ${t.common_hour_short}`);
+    if (m > 0) parts.push(`${m} ${t.common_min_short}`);
+    return parts.length > 0 ? parts.join(' ') : `< 1 ${t.common_min_short}`;
   })();
 
   const wearPerHour =
@@ -70,14 +72,14 @@ const BreakdownPanel: React.FC<Props> = ({ result, input }) => {
   return (
     <Stack spacing={1.5}>
       <Typography variant="subtitle2" fontWeight={700} color="text.secondary" textTransform="uppercase" letterSpacing={0.5}>
-        Детализация себестоимости
+        {t.brk_title}
       </Typography>
 
       {/* Сложность модели */}
       <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: 'primary.50', border: '1px solid', borderColor: 'primary.200' }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center">
           <Typography variant="body2" fontWeight={600} color="primary.main">
-            Сложность модели
+            {t.calc_complexity}
           </Typography>
           <Typography variant="body2" fontWeight={700} color="primary.main">
             {result.complexityLabel}{'\u00A0'}<Typography component="span" variant="caption" color="primary">×{result.complexityCoefficient}</Typography>
@@ -85,7 +87,7 @@ const BreakdownPanel: React.FC<Props> = ({ result, input }) => {
         </Stack>
         {result.complexityCoefficient > 1 && (
           <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-            Применяется к стоимости печати и обработки
+            {t.calc_complexity_desc}
           </Typography>
         )}
       </Box>
@@ -93,14 +95,14 @@ const BreakdownPanel: React.FC<Props> = ({ result, input }) => {
       {/* Материал */}
       <Box>
         <BreakdownRow
-          label={`Материал (${input.partWeight} г × ${result.gramCost.toFixed(2)} ₽)`}
+          label={`${t.brk_material} (${input.partWeight} ${t.common_grams} × ${result.gramCost.toFixed(2)} ₽)`}
           value={result.materialCost}
           total={result.costPrice}
           color="#2563EB"
         />
         {result.gramCost > 0 && (
           <Typography variant="caption" color="text.secondary" sx={{ pl: 0 }}>
-            Катушка: {input.spoolPrice} ₽ / {input.spoolWeight} г = {result.gramCost.toFixed(2)} ₽ за г
+            {t.calc_spool_label}: {input.spoolPrice} ₽ / {input.spoolWeight} {t.common_grams} = {result.gramCost.toFixed(2)} ₽/{t.common_grams}
           </Typography>
         )}
       </Box>
@@ -108,7 +110,7 @@ const BreakdownPanel: React.FC<Props> = ({ result, input }) => {
       {/* Электроэнергия */}
       <Box>
         <BreakdownRow
-          label={`Электроэнергия (${input.powerWatts} Вт · ${timeStr})`}
+          label={`${t.brk_electricity} (${input.powerWatts} ${t.common_watts} · ${timeStr})`}
           value={result.electricityCost}
           total={result.costPrice}
           color="#7C3AED"
@@ -122,8 +124,8 @@ const BreakdownPanel: React.FC<Props> = ({ result, input }) => {
       <Box>
         <BreakdownRow
           label={result.complexityCoefficient > 1
-            ? `Износ принтера (${wearPerHour.toFixed(2)} ₽/ч · ${timeStr}) ×${result.complexityCoefficient}`
-            : `Износ принтера (${wearPerHour.toFixed(2)} ₽/ч · ${timeStr})`
+            ? `${t.brk_printer_wear} (${wearPerHour.toFixed(2)} ₽/${t.common_hour_short} · ${timeStr}) ×${result.complexityCoefficient}`
+            : `${t.brk_printer_wear} (${wearPerHour.toFixed(2)} ₽/${t.common_hour_short} · ${timeStr})`
           }
           value={result.wearCost}
           total={result.costPrice}
@@ -172,7 +174,7 @@ const BreakdownPanel: React.FC<Props> = ({ result, input }) => {
       {/* Доп. расходы */}
       {result.extraCost > 0 && (
         <BreakdownRow
-          label="Дополнительные расходы"
+          label={t.brk_extra}
           value={result.extraCost}
           total={result.costPrice}
           color="#64748B"
@@ -183,7 +185,7 @@ const BreakdownPanel: React.FC<Props> = ({ result, input }) => {
 
       {/* Себестоимость */}
       <BreakdownRow
-        label="Себестоимость"
+        label={t.calc_cost_price}
         value={result.costPrice}
         total={result.costPrice}
         bold
@@ -192,10 +194,10 @@ const BreakdownPanel: React.FC<Props> = ({ result, input }) => {
       {/* Прибыль */}
       <Stack direction="row" justifyContent="space-between">
         <Typography variant="body2" color="success.main" fontWeight={600}>
-          Прибыль{' '}
+          {t.res_profit}{' '}
           {result.profitMode === 'percent'
             ? `(${result.profitValue}%)`
-            : '(фиксированная)'}
+            : `(${t.res_fixed_profit.toLowerCase()})`}
         </Typography>
         <Typography variant="body2" color="success.main" fontWeight={600}>
           + {formatMoney(result.profit)}
@@ -206,7 +208,7 @@ const BreakdownPanel: React.FC<Props> = ({ result, input }) => {
 
       {/* Итог */}
       <Stack direction="row" justifyContent="space-between">
-        <Typography variant="body1" fontWeight={700}>Итог (за 1 деталь)</Typography>
+        <Typography variant="body1" fontWeight={700}>{t.brk_total} ({t.res_piece_short})</Typography>
         <Typography variant="body1" fontWeight={700} color="primary">
           {formatMoney(result.pricePerPiece)}
         </Typography>
@@ -216,17 +218,17 @@ const BreakdownPanel: React.FC<Props> = ({ result, input }) => {
       {result.roundingEnabled && result.pricePerPieceRounded !== null && (
         <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: 'action.hover' }}>
           <Stack direction="row" justifyContent="space-between">
-            <Typography variant="body2" color="text.secondary">До округления</Typography>
+            <Typography variant="body2" color="text.secondary">{t.res_before_rounding}</Typography>
             <Typography variant="body2">{formatMoney(result.pricePerPiece)}</Typography>
           </Stack>
           <Stack direction="row" justifyContent="space-between">
-            <Typography variant="body2" fontWeight={700}>После округления</Typography>
+            <Typography variant="body2" fontWeight={700}>{t.res_after}</Typography>
             <Typography variant="body2" fontWeight={700} color="primary">
               {formatMoney(result.pricePerPieceRounded)}
             </Typography>
           </Stack>
           <Typography variant="caption" color="text.secondary">
-            Разница: {formatMoney(Math.abs(result.pricePerPieceRounded - result.pricePerPiece))}
+            {t.res_batch_before_rounding}: {formatMoney(Math.abs(result.pricePerPieceRounded - result.pricePerPiece))}
           </Typography>
         </Box>
       )}
@@ -236,11 +238,11 @@ const BreakdownPanel: React.FC<Props> = ({ result, input }) => {
         <>
           <Divider />
           <Stack direction="row" justifyContent="space-between">
-            <Typography variant="body2" color="text.secondary">Количество</Typography>
-            <Typography variant="body2">{input.quantity} шт.</Typography>
+            <Typography variant="body2" color="text.secondary">{t.calc_quantity_parts}</Typography>
+            <Typography variant="body2">{input.quantity} {t.res_pieces}</Typography>
           </Stack>
           <Stack direction="row" justifyContent="space-between">
-            <Typography variant="body1" fontWeight={700}>Итого за партию</Typography>
+            <Typography variant="body1" fontWeight={700}>{t.brk_total} ({t.res_batch.toLowerCase()})</Typography>
             <Typography variant="body1" fontWeight={700} color="primary">
               {result.roundingEnabled && result.totalPriceRounded !== null
                 ? formatMoney(result.totalPriceRounded)

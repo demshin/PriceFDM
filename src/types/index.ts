@@ -112,12 +112,15 @@ export interface Project {
   defectRate?: number;
 }
 
+export type AppLanguage = 'ru' | 'en';
+
 export interface AppSettings {
   defaultElectricityCost: number;
   defaultPowerWatts: number;
   defaultPrinterLifeHours: number;
   defaultProfitPercent: number;
   colorMode: 'light' | 'dark';
+  language: AppLanguage;
 }
 
 /**
@@ -144,4 +147,16 @@ export interface ProfitEntry {
   projectId?: string;
   /** Ручная запись (не привязана к расчёту) */
   isManual?: boolean;
+}
+
+/** Позиция на складе */
+export interface WarehouseItem {
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+  quantity: number;
+  unit: string; // 'шт', 'м', 'кг', 'упак' и т.д.
+  note?: string;
+  createdAt: string;
 }

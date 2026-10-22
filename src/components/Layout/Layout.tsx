@@ -29,16 +29,12 @@ import MenuIcon from '@mui/icons-material/Menu';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 
-export type AppTab = 'calculator' | 'spools' | 'printers' | 'history' | 'profit' | 'settings';
+import WarehouseIcon from '@mui/icons-material/Warehouse';
+import { useTranslation } from '../../i18n/useTranslation';
 
-const TABS: { id: AppTab; label: string; icon: React.ReactNode }[] = [
-  { id: 'calculator', label: 'Расчёт', icon: <CalculateIcon /> },
-  { id: 'spools', label: 'Катушки', icon: <SpoolIcon /> },
-  { id: 'printers', label: 'Принтеры', icon: <PrintIcon /> },
-  { id: 'history', label: 'История', icon: <HistoryIcon /> },
-  { id: 'profit', label: 'Прибыль', icon: <TrendingUpIcon /> },
-  { id: 'settings', label: 'Настройки', icon: <SettingsIcon /> },
-];
+export type AppTab = 'calculator' | 'warehouse' | 'spools' | 'printers' | 'history' | 'profit' | 'settings';
+
+// Tabs are built dynamically inside the component via translations
 
 interface Props {
   activeTab: AppTab;
@@ -58,6 +54,17 @@ const Layout: React.FC<Props> = ({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { t } = useTranslation();
+
+  const TABS: { id: AppTab; label: string; icon: React.ReactNode }[] = [
+    { id: 'calculator', label: t.nav_calculator, icon: <CalculateIcon /> },
+    { id: 'warehouse', label: t.nav_warehouse, icon: <WarehouseIcon /> },
+    { id: 'spools', label: t.nav_spools, icon: <SpoolIcon /> },
+    { id: 'printers', label: t.nav_printers, icon: <PrintIcon /> },
+    { id: 'history', label: t.nav_history, icon: <HistoryIcon /> },
+    { id: 'profit', label: t.nav_profit, icon: <TrendingUpIcon /> },
+    { id: 'settings', label: t.nav_settings, icon: <SettingsIcon /> },
+  ];
 
   const handleTabChange = (tab: AppTab) => {
     onTabChange(tab);
@@ -74,6 +81,7 @@ const Layout: React.FC<Props> = ({
           borderColor: 'divider',
           bgcolor: 'background.paper',
           color: 'text.primary',
+          pt: 'var(--sat, 0px)', // safe area для статус-бара
         }}
       >
         <Toolbar sx={{ gap: 1 }}>
@@ -129,8 +137,14 @@ const Layout: React.FC<Props> = ({
         </Toolbar>
       </AppBar>
 
-      {/* Mobile Drawer */}
-      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+      {/* Mobile Drawer — свайп слева направо открывает */}
+      <Drawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        slotProps={{
+          paper: { sx: { pt: 'var(--sat, 0px)' } },
+        }}
+      >
         <Box sx={{ width: 240, pt: 1 }}>
           <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 2, py: 1.5 }}>
             <CalculateIcon color="primary" />
@@ -154,7 +168,7 @@ const Layout: React.FC<Props> = ({
 
       <Container
         maxWidth="xl"
-        sx={{ py: { xs: 2, md: 3 }, flex: 1 }}
+        sx={{ py: { xs: 2, md: 3 }, pb: { xs: 'calc(16px + var(--sab, 0px))', md: 3 }, flex: 1 }}
       >
         {children}
       </Container>

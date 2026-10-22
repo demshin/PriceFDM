@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/icon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>PriceFDM — Расчёт стоимости 3D-печати</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -11,6 +11,11 @@
     <style>
       *, *::before, *::after { box-sizing: border-box; }
       body { margin: 0; -webkit-font-smoothing: antialiased; }
+      /* Safe area for mobile (status bar, notch) */
+      :root {
+        --sat: env(safe-area-inset-top, 0px);
+        --sab: env(safe-area-inset-bottom, 0px);
+      }
     </style>
   </head>
   <body>
